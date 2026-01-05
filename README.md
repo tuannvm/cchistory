@@ -6,7 +6,9 @@
 
 A macOS menu bar application that displays your Claude Code conversation history locally. No server, no tracking—just quick access to your sessions.
 
-![CCHistory Screenshot](Assets.xcassets/AppIcon.appiconset/screenshot.png)
+<div align="center">
+  <img src="Assets.xcassets/AppIcon.appiconset/screenshot.png" alt="CCHistory Screenshot" width="600">
+</div>
 
 ## Features
 
