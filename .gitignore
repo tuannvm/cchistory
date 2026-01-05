@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Xcode
+*.xcodeproj
+*.xcuserdata
+*.xcworkspace
+xcuserdata/
+
+# Swift Package Manager
+.swiftpm/
+.swift-version
+.build/
+
+# Build artifacts
+build/
+*.app
+*.dSYM
+CCHistory.app
+*.zip
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+ralph-loop.local.md
+
+# Assets placeholder
+Assets/screenshot.png.placeholder

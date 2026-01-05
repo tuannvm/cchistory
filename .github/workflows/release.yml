@@ -1,0 +1,78 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  ci:
+    name: Run CI
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  build:
+    name: Build macOS App
+    runs-on: macos-latest
+    needs: ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build
+        run: |
+          # Build using Swift Package Manager
+          swift build -c release --product CCHistory
+
+          # Create app bundle
+          mkdir -p CCHistory.app/Contents/MacOS
+          cp .build/release/CCHistory CCHistory.app/Contents/MacOS/
+
+          # Create Info.plist
+          cat > CCHistory.app/Contents/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>CCHistory</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.cchistory.app</string>
+            <key>CFBundleName</key>
+            <string>CCHistory</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>13.0</string>
+            <key>LSUIElement</key>
+            <true/>
+            <key>NSPrincipalClass</key>
+            <string>NSApplication</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+          # Zip the app
+          zip -r CCHistory.zip CCHistory.app
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: CCHistory.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
