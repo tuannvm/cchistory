@@ -49,7 +49,7 @@ jobs:
             brew install swift-format
           fi
           # Check formatting (don't modify)
-          swift-format --recursive --strict-format Sources/ Tests/
+          swift-format lint --recursive Sources/ Tests/
 
       - name: Build for verification
         run: swift build -c release
