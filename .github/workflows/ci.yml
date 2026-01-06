@@ -20,7 +20,7 @@ permissions:
   security-events: write
 
 env:
-  SWIFT_VERSION: "5.10"
+  SWIFT_VERSION: "6.0"
 
 jobs:
   # Code quality and formatting check
@@ -66,7 +66,7 @@ jobs:
           persist-credentials: false
 
       - name: Run dependency scan
-        uses: aquasecurity/trivy-action@v0.24
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: "fs"
           scan-ref: "."
