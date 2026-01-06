@@ -13,11 +13,17 @@ struct CCHistory: App {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var historyParser = HistoryParser()
     var sessions: [Session] = []
     var currentSortOption: SessionSortOption = .mostActive
+
+    // Async loading state
+    private var cachedSessions: [Session] = []
+    private var isLoading = false
+    private var cacheInvalidated = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create menu bar status item
@@ -28,11 +34,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image?.isTemplate = true
         }
 
-        buildMenu()
+        // Trigger initial async load
+        loadSessionsAsync()
 
         // Refresh menu every 30 seconds
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.refreshMenu()
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Invalidate cache when app becomes active (user may have new sessions)
+        cacheInvalidated = true
+    }
+
+    private func loadSessionsAsync() {
+        guard !isLoading else { return }
+
+        isLoading = true
+
+        let sortOption = currentSortOption
+
+        Task(priority: .userInitiated) {
+            // Run parsing off the main actor
+            let sessions = await Task.detached {
+                let parser = HistoryParser()
+                return parser.getSessions(sortOption: sortOption, limit: 10)
+            }.value
+
+            // Update UI on main actor
+            await MainActor.run { [weak self] in
+                guard let self = self else { return }
+                self.cachedSessions = sessions
+                self.sessions = sessions
+                self.isLoading = false
+                self.cacheInvalidated = false
+                self.buildMenu()
+            }
         }
     }
 
@@ -76,16 +114,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(sortMenuItem)
         menu.addItem(NSMenuItem.separator())
 
-        // Load sessions with current sort option
-        sessions = historyParser.getSessions(sortOption: currentSortOption, limit: 10)
+        // Use cached sessions if available, otherwise show loading
+        let sessionsToDisplay: [Session]
+        if isLoading && cachedSessions.isEmpty {
+            // Show loading indicator
+            let loadingItem = NSMenuItem(title: "Loading...", action: nil, keyEquivalent: "")
+            loadingItem.isEnabled = false
+            menu.addItem(loadingItem)
+            sessionsToDisplay = []
+        } else if cacheInvalidated && !isLoading {
+            // Cache invalidated but not loading, trigger load and use stale cache
+            sessionsToDisplay = cachedSessions.isEmpty ? [] : cachedSessions
+            loadSessionsAsync()
+        } else {
+            // Use cached sessions
+            sessionsToDisplay = cachedSessions
+        }
 
-        if sessions.isEmpty {
+        if sessionsToDisplay.isEmpty {
             let noSessionsItem = NSMenuItem(title: "No sessions found", action: nil, keyEquivalent: "")
             noSessionsItem.isEnabled = false
             menu.addItem(noSessionsItem)
         } else {
             // Add each session
-            for (index, session) in sessions.enumerated() {
+            for (index, session) in sessionsToDisplay.enumerated() {
                 let menuItem = SessionMenuItem(session: session)
                 menuItem.tag = index
                 menuItem.action = #selector(sessionClicked(_:))
@@ -124,6 +176,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let index = SessionSortOption.allCases.firstIndex(where: { $0.rawValue == sender.title }),
            let newOption = SessionSortOption.allCases.element(at: index) {
             currentSortOption = newOption
+            // Invalidate cache and reload with new sort option
+            cacheInvalidated = true
+            loadSessionsAsync()
             buildMenu()
         }
     }
@@ -150,6 +205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func refreshMenu() {
+        // Invalidate cache and reload
+        cacheInvalidated = true
+        loadSessionsAsync()
         buildMenu()
     }
 
@@ -159,8 +217,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        copyResumeCommand(for: session)
-        showNotification(for: session)
+        // Get session from cache to ensure we have the latest data
+        if let cachedSession = cachedSessions.first(where: { $0.id == session.id }) {
+            copyResumeCommand(for: cachedSession)
+            showNotification(for: cachedSession)
+        } else {
+            copyResumeCommand(for: session)
+            showNotification(for: session)
+        }
     }
 
     private func copyResumeCommand(for session: Session) {
