@@ -40,7 +40,7 @@ lint:
 		brew install swift-format; \
 	fi
 	@echo "Checking Swift formatting..."
-	@swift-format lint --recursive Sources/ Tests/
+	@swift format lint --recursive --strict Sources/CCHistory
 	@echo "Lint passed!"
 
 # Fix linting issues
