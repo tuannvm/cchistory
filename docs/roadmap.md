@@ -28,23 +28,31 @@ Enable users to quickly find relevant sessions by searching through conversation
 
 ---
 
-## Feature: Custom `.claude` Folder Location
+## Feature: Custom `.claude` Folder Location ⚠️ PARTIAL
 
 Allow users to specify a custom location for their Claude Code projects directory.
 
-### Scope
-- Single global setting (not per-project overrides)
-- Preferences/Settings window with path picker
-- Path validation and error handling
-- UserDefaults persistence
+### Status
+- ✅ Backend: `HistoryParser` accepts `claudePath` parameter with security validation
+- ❌ UI: No Settings window to configure the path
+- ❌ Persistence: No UserDefaults integration
 
-### Implementation Approach
+### What's Already Implemented (`HistoryParser.swift:9-25`)
+```swift
+init(claudePath: String? = nil) {
+    // Security validation for dangerous characters
+    // Path standardization to prevent traversal attacks
+    // Falls back to ~/.claude if invalid
+}
+```
+
+### Remaining Work
 1. **Settings Window**: Create `NSWindow` or `NSPanel` with:
    - Text field showing current path
    - "Browse..." button with `NSOpenPanel`
    - "Reset to Default" button (`~/.claude`)
 2. **Storage**: Use `UserDefaults.standard` with key like `claudeProjectsPath`
-3. **Integration**: Update `HistoryParser` to read from custom path instead of hardcoded `NSHomeDirectory()/.claude/projects`
+3. **Integration**: Wire Settings UI to `HistoryParser` init
 4. **Validation**: Check path exists and contains expected structure before applying
 
 ### Open Questions
@@ -54,51 +62,77 @@ Allow users to specify a custom location for their Claude Code projects director
 
 ---
 
-## Feature: Performance Improvements (Async Loading)
+## Feature: Performance Improvements (Async Loading) ✅ COMPLETED
 
-Eliminate the blocking UI delay on app launch by implementing asynchronous session parsing.
+Implemented asynchronous session parsing to eliminate blocking UI delay.
 
-### Current Problem
-- `HistoryParser.parseSessionsFromProjects()` runs synchronously on main thread
-- App shows nothing until all sessions are parsed
-- For large histories, this causes noticeable delay (seconds)
+### What Was Built
+- **Immediate UI**: Menu shows "Loading..." indicator on app launch
+- **Background Parsing**: Uses `Task.detached(priority: .userInitiated)` for off-main-thread parsing
+- **In-Memory Cache**: `cachedSessions` stores parsed results
+- **Auto-refresh**: Timer invalidates cache every 30 seconds
+- **Cache Invalidation**: On `applicationDidBecomeActive` (user returns to app)
 
-### Proposed Solution
-1. **Immediate UI**: Show menu with "Loading..." indicator on app launch
-2. **Background Parsing**: Move parsing to background using Swift concurrency:
-   ```swift
-   Task.detached(priority: .userInitiated) {
-       let sessions = await historyParser.parseSessionsFromProjects()
-       await MainActor.run {
-           self.buildMenu(with: sessions)
-       }
-   }
-   ```
-3. **In-Memory Cache**: Store parsed sessions to avoid re-parsing
-4. **Re-scan Strategy**: Only re-parse when app "reopens" (menu bar apps receive `applicationDidBecomeActive` or similar events)
+### Implementation
+See `CCHistory.swift:50-74` for `loadSessionsAsync()` implementation.
 
-### Implementation Changes
-- Refactor `HistoryParser` to use `async` functions
-- Add loading state to `AppDelegate`
-- Implement cache invalidation logic (time-based or manual refresh)
-- Consider debouncing rapid menu open/close events
+---
 
-### Open Questions
-- How often to invalidate cache? (Time-based vs. manual "Refresh" action vs. filesystem watcher)
-- Should we show session count while loading? (e.g., "Loaded 12/50 sessions...")
-- What if user tries to interact during load? (Disable menu items vs. show partial results)
+## Feature: About Dialog
+
+Show an About window with app version, repository link, and general information.
+
+### Scope
+- Menu item: "About CCHistory"
+- NSAlert/NSPanel showing:
+  - App name and version
+  - GitHub repository link
+  - Brief description
+  - Credits
+
+### Implementation Approach
+1. **Menu Item**: Add to menu bar before "Quit"
+2. **Version Source**: Read from Package.swift or Build version in Info.plist
+3. **Dialog**: Use `NSAlert` with custom message or create `NSWindow` as About panel
+4. **Link Handling**: Make repo URL clickable (via `NSAttributedString` with `.link` attribute)
+
+---
+
+## Feature: Improved Copy Feedback
+
+Replace/supplement the notification with a more visible and intuitive copy confirmation.
+
+### Current State
+- Uses `UNUserNotificationCenter` (system notification)
+- Can be intrusive and may be disabled by user
+- No visual feedback in the menu itself
+
+### Proposed Solutions
+1. **Toast-style popup**: Small transient window near menu bar that fades out
+2. **Menu item change**: Temporarily change clicked item text to "✓ Copied!" then revert
+3. **Sound + visual**: Play subtle sound + show brief overlay
+4. **Status bar tooltip**: Show brief message in status item button
+
+### Implementation Considerations
+- Should not block menu interaction
+- Should be dismissible or auto-dismiss after 1-2 seconds
+- Should work even if notifications are disabled
 
 ---
 
 ## Priority Considerations
 
-| Feature | Impact | Complexity | Dependencies |
-|---------|--------|------------|--------------|
-| Async Loading | High | Medium | None |
-| Search | High | Medium | Async Loading (for better UX) |
-| Custom Path | Low | Low | None |
+| Feature | Impact | Complexity | Dependencies | Status |
+|---------|--------|------------|--------------|--------|
+| Async Loading | High | Medium | None | ✅ Done |
+| Search | High | Medium | None | 📋 Todo |
+| Custom Path (UI) | Medium | Low | Partial backend exists | 📋 Todo |
+| About Dialog | Low | Low | None | 📋 Todo |
+| Improved Copy Feedback | Medium | Low | None | 📋 Todo |
 
 **Suggested order:**
-1. Async Loading (foundational performance fix)
-2. Search (high-value feature, builds on async work)
-3. Custom Path (lower priority, independent)
+1. ~~Async Loading~~ ✅ (completed)
+2. About Dialog (quick win, independent)
+3. Improved Copy Feedback (UX improvement)
+4. Custom Path UI (complete the partial backend)
+5. Search (larger feature, high value)
