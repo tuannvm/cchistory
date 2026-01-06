@@ -88,6 +88,100 @@ Claude Code stores sessions as JSONL files. Each line is a JSON object:
 
 **Security**: Uses `Process` with argument arrays instead of shell scripts to prevent command injection.
 
+## Menu Bar Icon
+
+The CCHistory menu bar icon is generated programmatically using `NSBezierPath` drawing in `IconData.swift`. This approach avoids file loading issues and ensures consistent rendering across different macOS versions.
+
+### How It Works
+
+The icon is created as an extension on `NSImage`:
+
+```swift
+extension NSImage {
+    static let cchistoryLogo: NSImage = {
+        // 22x22 pixel image for menu bar display
+        let size = NSSize(width: 22, height: 22)
+        let image = NSImage(size: size)
+        image.isTemplate = false  // Preserve colors
+        image.lockFocus()
+
+        // Draw using NSBezierPath
+        // 1. Dark rounded background
+        // 2. Orange speech bubble
+        // 3. Clock symbol with hands
+        // 4. Message dots
+
+        image.unlockFocus()
+        return image
+    }()
+}
+```
+
+### Key Design Elements
+
+| Element | Color | Position |
+|---------|-------|----------|
+| Background | Dark (#1a1a1a) | Full 22x22 area |
+| Rounded square | Dark gray (#262626) | Centered, 5px corner radius |
+| Speech bubble | Orange (#D97757) | Center-left |
+| Clock face | Dark (#1a1a1a, 90% opacity) | Inside bubble |
+| Clock hands | Orange (#D97757) | Center of clock |
+| Message dots | Dark (#1a1a1a, 60% opacity) | Bottom of bubble |
+
+### Important Implementation Details
+
+1. **`isTemplate = false`** - Critical! Without this, macOS renders the icon as a single-color silhouette (white square in dark mode)
+2. **Fill entire area first** - Prevents transparency issues
+3. **`resizingMode = .stretch`** - Ensures proper scaling
+4. **22x22 points** - Standard menu bar icon size (displays as 44x44 pixels on Retina)
+
+### Modifying the Icon
+
+To modify the icon design:
+
+1. Edit `Sources/CCHistory/IconData.swift`
+2. Adjust the `NSBezierPath` drawing commands
+3. Rebuild and test: `./build.sh && open CCHistory.app`
+
+### Original Logo
+
+The original logo design is in `Sources/CCHistory/Assets.xcassets/AppIcon.appiconset/logo.svg` as a reference, but the menu bar icon is a simplified programmatic version optimized for small size display.
+
+## Async Loading
+
+CCHistory uses asynchronous loading to ensure the app launches instantly without blocking the UI while parsing session files.
+
+### Architecture
+
+```
+AppDelegate (MainActor)
+  ├── cachedSessions: [Session]     // In-memory cache
+  ├── isLoading: Bool               // Loading state
+  └── cacheInvalidated: Bool        // Dirty flag
+
+loadSessionsAsync()
+  → Task.detached runs parsing off main thread
+  → MainActor.run updates UI on completion
+
+buildMenu()
+  → Shows "Loading..." if isLoading && no cache
+  → Uses cachedSessions if available
+  → Triggers reload if cacheInvalidated
+```
+
+### Cache Invalidation
+
+The cache is invalidated in these scenarios:
+1. **App activation** (`applicationDidBecomeActive`) - User may have new sessions
+2. **Sort option change** - Different sort requires re-parsing
+3. **Manual refresh** - User presses `Cmd+R`
+
+### Swift 6 Concurrency
+
+- `@MainActor` on `AppDelegate` ensures all UI operations run on main thread
+- `Task.detached` runs parsing in background without blocking UI
+- `MainActor.run` ensures UI updates happen on main thread after parsing completes
+
 ## Sorting Options
 
 | Option | Description | Shortcut |

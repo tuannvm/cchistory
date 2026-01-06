@@ -20,7 +20,11 @@ swift build -c release --product CCHistory
 # Create app bundle
 rm -rf CCHistory.app
 mkdir -p CCHistory.app/Contents/MacOS
+mkdir -p CCHistory.app/Contents/Resources
 cp .build/release/CCHistory CCHistory.app/Contents/MacOS/
+
+# Note: Menu bar icon is now generated programmatically in IconData.swift
+# No need to copy icon files to Resources
 
 # Create Info.plist
 cat > CCHistory.app/Contents/Info.plist << 'EOF'

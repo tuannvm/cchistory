@@ -7,6 +7,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "CCHistory",
+            resources: [.process("Assets.xcassets")],
             linkerSettings: [
                 .linkedFramework("Cocoa"),
                 .linkedFramework("UserNotifications")
