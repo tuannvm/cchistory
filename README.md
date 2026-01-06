@@ -1,5 +1,10 @@
 # CCHistory
 
+[![Swift](https://img.shields.io/badge/Swift-6.2-orange?logo=swift&logoColor=white)](https://swift.org)
+[![macOS](https://img.shields.io/badge/macOS-13.0+-blue?logo=apple&logoColor=white)](https://www.apple.com/macos)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/tuannvm/cchistory)](https://github.com/tuannvm/cchistory/releases)
+
 <div align="center">
   <img src="Assets.xcassets/AppIcon.appiconset/logo.svg" alt="CCHistory Logo" width="128" height="128">
 </div>
