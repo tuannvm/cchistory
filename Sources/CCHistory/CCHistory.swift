@@ -217,6 +217,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     aboutItem.target = self
     menu.addItem(aboutItem)
 
+    menu.addItem(NSMenuItem.separator())
+
     // LLM Naming info item
     let llmInfoItem = NSMenuItem(
       title: "💡 Tip: Rename unnamed sessions via LLM",
