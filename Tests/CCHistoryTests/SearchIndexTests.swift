@@ -334,7 +334,7 @@ final class SearchIndexTests: XCTestCase {
   func testSearchIndexIsSendable() {
     // This test verifies SearchIndex conforms to Sendable
     // If it compiles, the conformance is valid
-    let index = SearchIndex()
+    var index = SearchIndex()
     let session = Session(
       id: "session-1",
       sessionId: "test-1",

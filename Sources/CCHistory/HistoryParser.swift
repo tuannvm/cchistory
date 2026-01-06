@@ -150,10 +150,13 @@ final class HistoryParser {
             messageCount += 1
           }
         case "assistant":
+
           if let content = json["content"] as? [String: Any],
-            let text = content["text"] as? String {
+            let text = content["text"] as? String
+          {
             messageContent = text
           }
+
           // Check timestamp from assistant messages
           if let timestampStr = json["timestamp"] as? String {
             if let date = formatter.date(from: timestampStr) {

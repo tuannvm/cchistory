@@ -370,7 +370,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     buildMenu()
 
     // Reset feedback after 1.5 seconds
-    copyFeedbackTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: false) { [weak self] _ in
+    copyFeedbackTimer = Timer.scheduledTimer(
+      withTimeInterval: 1.5,
+      repeats: false
+    ) { [weak self] _ in
       Task { @MainActor in
         self?.copiedSessionId = nil
         self?.buildMenu()
@@ -454,7 +457,7 @@ final class SessionMenuItem: NSMenuItem {
         string: title,
         attributes: [
           .foregroundColor: NSColor.systemGreen,
-          .font: NSFont.boldSystemFont(ofSize: 13)
+          .font: NSFont.boldSystemFont(ofSize: 13),
         ]
       )
     }

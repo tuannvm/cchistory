@@ -12,7 +12,7 @@ final class HistoryParserTests: XCTestCase {
     // Verify it works by attempting to parse (will return empty for non-existent path)
     let sessions = parser.parseSessionsFromProjects()
     // Should not crash and return empty array for default path
-    XCTAssertTrue(sessions is [Session])
+    XCTAssertTrue(sessions.isEmpty)
   }
 
   func testInitCustomPath() {
@@ -48,10 +48,10 @@ final class HistoryParserTests: XCTestCase {
     )
 
     XCTAssertNotNil(session)
-    XCTAssertEqual(session?.sessionId, "test-session-id")
-    XCTAssertEqual(session?.displayName, "Build authentication feature")
-    XCTAssertEqual(session?.projectPath, "/Users/test/project")
-    XCTAssertEqual(session?.messageCount, 2)
+    XCTAssertEqual(session?.session.sessionId, "test-session-id")
+    XCTAssertEqual(session?.session.displayName, "Build authentication feature")
+    XCTAssertEqual(session?.session.projectPath, "/Users/test/project")
+    XCTAssertEqual(session?.session.messageCount, 2)
 
     // Clean up
     try? FileManager.default.removeItem(at: sessionFile)
@@ -158,7 +158,7 @@ final class HistoryParserTests: XCTestCase {
 
     // Should still parse valid lines
     XCTAssertNotNil(session)
-    XCTAssertEqual(session?.displayName, "Valid session")
+    XCTAssertEqual(session?.session.displayName, "Valid session")
 
     // Clean up
     try? FileManager.default.removeItem(at: sessionFile)
@@ -188,7 +188,7 @@ final class HistoryParserTests: XCTestCase {
     )
 
     XCTAssertNotNil(session)
-    XCTAssertEqual(session?.messageCount, 3)
+    XCTAssertEqual(session?.session.messageCount, 3)
 
     // Clean up
     try? FileManager.default.removeItem(at: sessionFile)
@@ -226,7 +226,7 @@ final class HistoryParserTests: XCTestCase {
 
     XCTAssertNotNil(expectedDate)
     // Unwrap optionals for accurate comparison
-    let actualTimestamp = session?.timestamp.timeIntervalSince1970
+    let actualTimestamp = session?.session.timestamp.timeIntervalSince1970
     let expectedTimestamp = expectedDate?.timeIntervalSince1970
     XCTAssertNotNil(actualTimestamp)
     XCTAssertNotNil(expectedTimestamp)
