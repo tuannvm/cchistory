@@ -88,6 +88,41 @@ Claude Code stores sessions as JSONL files. Each line is a JSON object:
 
 **Security**: Uses `Process` with argument arrays instead of shell scripts to prevent command injection.
 
+## Async Loading
+
+CCHistory uses asynchronous loading to ensure the app launches instantly without blocking the UI while parsing session files.
+
+### Architecture
+
+```
+AppDelegate (MainActor)
+  ├── cachedSessions: [Session]     // In-memory cache
+  ├── isLoading: Bool               // Loading state
+  └── cacheInvalidated: Bool        // Dirty flag
+
+loadSessionsAsync()
+  → Task.detached runs parsing off main thread
+  → MainActor.run updates UI on completion
+
+buildMenu()
+  → Shows "Loading..." if isLoading && no cache
+  → Uses cachedSessions if available
+  → Triggers reload if cacheInvalidated
+```
+
+### Cache Invalidation
+
+The cache is invalidated in these scenarios:
+1. **App activation** (`applicationDidBecomeActive`) - User may have new sessions
+2. **Sort option change** - Different sort requires re-parsing
+3. **Manual refresh** - User presses `Cmd+R`
+
+### Swift 6 Concurrency
+
+- `@MainActor` on `AppDelegate` ensures all UI operations run on main thread
+- `Task.detached` runs parsing in background without blocking UI
+- `MainActor.run` ensures UI updates happen on main thread after parsing completes
+
 ## Sorting Options
 
 | Option | Description | Shortcut |

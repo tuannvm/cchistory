@@ -13,6 +13,7 @@ A macOS menu bar application that displays your Claude Code conversation history
 ## Features
 
 - Menu bar icon showing all Claude Code sessions
+- **Instant launch with async loading**—no UI blocking while parsing sessions
 - Smart sorting: Most Active, Most Recent, Last Hour/24H/Week, All Time
 - Displays repo name, git branch, timestamp, and message count per session
 - One-click resume command to clipboard (`Cmd+R` to refresh)
