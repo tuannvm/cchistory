@@ -76,11 +76,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     let sortOption = currentSortOption
 
+    // Get custom path from settings to respect user configuration
+    let claudePathKey = "claudeProjectsPath"
+    let customPath = UserDefaults.standard.string(forKey: claudePathKey)
+
     Task(priority: .userInitiated) {
       // Run parsing off the main actor
       // Note: We fetch more sessions for search index (200) but display fewer
       let parseResult = await Task.detached {
-        let parser = HistoryParser()
+        let parser = HistoryParser(claudePath: customPath)
         return parser.getSessionsWithIndex(sortOption: sortOption, limit: 200)
       }.value
 
