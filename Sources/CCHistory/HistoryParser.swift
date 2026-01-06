@@ -24,15 +24,27 @@ final class HistoryParser {
     }
   }
 
+  /// Parse result containing sessions and search index
+  struct ParseResult: Sendable {
+    var sessions: [Session]
+    var searchIndex: SearchIndex
+  }
+
   /// Parse sessions from project directories
   func parseSessionsFromProjects() -> [Session] {
+    return parseSessionsWithIndex().sessions
+  }
+
+  /// Parse sessions from project directories with search index
+  func parseSessionsWithIndex() -> ParseResult {
     let projectsPath = "\(claudePath)/projects"
     guard let projectDirs = try? fileManager.contentsOfDirectory(atPath: projectsPath) else {
       print("Failed to list projects directory")
-      return []
+      return ParseResult(sessions: [], searchIndex: SearchIndex())
     }
 
-    var sessions: [Session] = []
+    var parsedSessions: [ParsedSession] = []
+    var searchIndex = SearchIndex()
 
     for projectDir in projectDirs {
       // Skip hidden files
@@ -56,20 +68,33 @@ final class HistoryParser {
         // Extract session ID from filename (remove .jsonl extension)
         let sessionId = String(sessionFile.dropLast(6))
 
-        // Parse session file to get summary and timestamp
-        if let sessionData = parseSessionFile(
+        // Parse session file to get summary, timestamp, and messages
+        if let parsedSession = parseSessionFile(
           path: sessionFilePath, sessionId: sessionId, projectPath: projectPath)
         {
-          sessions.append(sessionData)
+          parsedSessions.append(parsedSession)
         }
       }
     }
 
-    return sessions
+    // Build sessions array and search index
+    var sessions: [Session] = []
+    for parsedSession in parsedSessions {
+      sessions.append(parsedSession.session)
+      searchIndex.indexSession(parsedSession.session, messages: parsedSession.messages)
+    }
+
+    return ParseResult(sessions: sessions, searchIndex: searchIndex)
+  }
+
+  /// Parse result containing session and searchable messages
+  struct ParsedSession: Sendable {
+    let session: Session
+    let messages: [String]
   }
 
   /// Parse a single session file to extract summary and metadata
-  func parseSessionFile(path: String, sessionId: String, projectPath: String) -> Session? {
+  func parseSessionFile(path: String, sessionId: String, projectPath: String) -> ParsedSession? {
     guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
       let content = String(data: data, encoding: .utf8)
     else {
@@ -79,6 +104,8 @@ final class HistoryParser {
     var summary: String?
     var latestTimestamp: TimeInterval = 0
     var messageCount = 0
+    var messages: [String] = []
+    var hasCapturedSummary = false
 
     // Custom date formatter for ISO8601 with fractional seconds
     let formatter = DateFormatter()
@@ -97,34 +124,52 @@ final class HistoryParser {
       if let type = json["type"] as? String, type == "summary",
         let summaryText = json["summary"] as? String
       {
-        if summary == nil {
+        if !hasCapturedSummary {
           summary = summaryText
+          hasCapturedSummary = true
         }
       }
 
-      // Extract timestamp from user messages (timestamp is at root level)
-      if let type = json["type"] as? String, type == "user",
-        let timestampStr = json["timestamp"] as? String
-      {
-        // Parse ISO8601 timestamp with fractional seconds
-        if let date = formatter.date(from: timestampStr) {
-          let timestamp = date.timeIntervalSince1970
-          if timestamp > latestTimestamp {
-            latestTimestamp = timestamp
-          }
-        }
-        messageCount += 1
-      }
+      // Extract message content for search index
+      if let type = json["type"] as? String {
+        var messageContent: String?
 
-      // Also check assistant messages for timestamp
-      if let type = json["type"] as? String, type == "assistant",
-        let timestampStr = json["timestamp"] as? String
-      {
-        if let date = formatter.date(from: timestampStr) {
-          let timestamp = date.timeIntervalSince1970
-          if timestamp > latestTimestamp {
-            latestTimestamp = timestamp
+        switch type {
+        case "user":
+          if let content = json["content"] as? String {
+            messageContent = content
           }
+          // Also check for timestamp from user messages
+          if let timestampStr = json["timestamp"] as? String {
+            if let date = formatter.date(from: timestampStr) {
+              let timestamp = date.timeIntervalSince1970
+              if timestamp > latestTimestamp {
+                latestTimestamp = timestamp
+              }
+            }
+            messageCount += 1
+          }
+        case "assistant":
+          if let content = json["content"] as? [String: Any],
+            let text = content["text"] as? String {
+            messageContent = text
+          }
+          // Check timestamp from assistant messages
+          if let timestampStr = json["timestamp"] as? String {
+            if let date = formatter.date(from: timestampStr) {
+              let timestamp = date.timeIntervalSince1970
+              if timestamp > latestTimestamp {
+                latestTimestamp = timestamp
+              }
+            }
+          }
+        default:
+          break
+        }
+
+        // Store message content for search indexing
+        if let msg = messageContent {
+          messages.append(msg)
         }
       }
     }
@@ -134,7 +179,7 @@ final class HistoryParser {
       return nil
     }
 
-    return Session(
+    let session = Session(
       id: UUID().uuidString,
       sessionId: sessionId,
       displayName: summary,
@@ -142,6 +187,8 @@ final class HistoryParser {
       projectPath: projectPath,
       messageCount: max(1, messageCount)
     )
+
+    return ParsedSession(session: session, messages: messages)
   }
 
   /// Get sessions with specified sorting and filtering
@@ -190,6 +237,56 @@ final class HistoryParser {
     }
 
     return Array(allSessions.prefix(limit))
+  }
+
+  /// Get sessions with specified sorting and filtering, including search index
+  func getSessionsWithIndex(sortOption: SessionSortOption, limit: Int = 10) -> ParseResult {
+    var parseResult = parseSessionsWithIndex()
+    var allSessions = parseResult.sessions
+
+    // Apply time filter if applicable
+    let timeFilter: TimeFilter
+    switch sortOption {
+    case .mostActive, .mostRecent, .allTime:
+      timeFilter = .allTime
+    case .lastHour:
+      timeFilter = .lastHour
+    case .lastDay:
+      timeFilter = .lastDay
+    case .lastWeek:
+      timeFilter = .lastWeek
+    }
+
+    // Extract git info for each session
+    for index in allSessions.indices {
+      if !allSessions[index].projectPath.isEmpty {
+        if let gitInfo = extractGitInfo(from: allSessions[index].projectPath) {
+          allSessions[index].gitBranch = gitInfo.branch
+          allSessions[index].gitRepoName = gitInfo.repoName
+        }
+      }
+    }
+
+    // Apply time filter
+    if timeFilter != .allTime {
+      allSessions = allSessions.filter { $0.matchesTimeFilter(timeFilter) }
+    }
+
+    // Sort based on option
+    switch sortOption {
+    case .mostActive:
+      allSessions.sort { first, second in
+        if first.messageCount != second.messageCount {
+          return first.messageCount > second.messageCount
+        }
+        return first.timestamp > second.timestamp
+      }
+    case .mostRecent, .lastHour, .lastDay, .lastWeek, .allTime:
+      allSessions.sort { $0.timestamp > $1.timestamp }
+    }
+
+    parseResult.sessions = Array(allSessions.prefix(limit))
+    return parseResult
   }
 
   /// Get sessions sorted by most messages (original behavior)

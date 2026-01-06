@@ -34,29 +34,43 @@ security find-identity -v -p codesigning
 ### Data Flow
 
 ```
-~/.claude/projects/
+~/.claude/projects/ (or custom path from Settings)
   └── <sanitized-project-path>/     (e.g., "Users-username-Projects-repo")
       └── <session-id>.jsonl         (JSONL file with messages)
 
-HistoryParser.parseSessionsFromProjects()
+HistoryParser.parseSessionsWithIndex()
   → Scans project directories
   → Parses each .jsonl file for summary + timestamps
-  → Extracts git info via shell commands
-  → Returns [Session] sorted by criteria
+  → Extracts message content for search index
+  → Builds SearchIndex with session metadata
+  → Returns ParseResult (sessions + searchIndex)
+  → Extracts git info via Process calls
 
 AppDelegate.buildMenu()
+  → Shows NSSearchField at top (live filtering)
   → Gets sessions from HistoryParser
+  → Applies search filter if query exists
   → Creates NSMenu with NSMenuItems
   → Each click copies resume command to clipboard
+  → Shows "✓ Copied" visual feedback for 1.5s
+
+SettingsWindow
+  → NSPanel with path text field
+  → Browse button for directory picker
+  → Validates path and shows errors
+  → Saves to UserDefaults on Apply
+  → Triggers re-parse on path change
 ```
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `CCHistory.swift` | Main app entry point, `@main` struct, `AppDelegate` with menu bar logic |
-| `HistoryParser.swift` | Parses `~/.claude/projects/*/*.jsonl` files, extracts git info via shell |
+| `CCHistory.swift` | Main app entry point, `@main` struct, `AppDelegate` with menu bar, search, and settings logic |
+| `HistoryParser.swift` | Parses `~/.claude/projects/*/*.jsonl` files, extracts git info via `Process`, builds search index |
+| `SearchIndex.swift` | In-memory search index for fast session lookup across names, paths, and message content |
 | `Session.swift` | Data models (`Session`, `SessionSortOption`, `TimeFilter`) with computed properties |
+| `SettingsWindow.swift` | `NSPanel` for configuring custom Claude projects directory with validation |
 | `build.sh` | Build script that requires `DEVELOPER_IDENTITY` env var |
 
 ### Session File Format

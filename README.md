@@ -5,24 +5,28 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/tuannvm/cchistory)](https://github.com/tuannvm/cchistory/releases)
 
-<div align="center">
-  <img src="Assets.xcassets/AppIcon.appiconset/logo.svg" alt="CCHistory Logo" width="128" height="128">
-</div>
+<p align="center">
+  <img src="Sources/CCHistory/Assets.xcassets/AppIcon.appiconset/logo.svg" alt="CCHistory Logo" width="128" height="128">
+</p>
 
-A macOS menu bar application that displays your Claude Code conversation history locally. No server, no tracking—just quick access to your sessions.
+A macOS menu bar application that displays your Claude Code conversation history locally. No server, no tracking - just quick access to your sessions.
 
-<div align="center">
-  <img src="Assets.xcassets/AppIcon.appiconset/screenshot.png" alt="CCHistory Screenshot" width="600">
-</div>
+<p align="center">
+  <img src="Sources/CCHistory/Assets.xcassets/AppIcon.appiconset/screenshot.png" alt="CCHistory Screenshot" width="600">
+</p>
 
 ## Features
 
 - Menu bar icon showing all Claude Code sessions
-- **Instant launch with async loading**—no UI blocking while parsing sessions
+- **Search across sessions** - find by name, project, branch, or message content
+- **Instant launch with async loading** - no UI blocking while parsing sessions
 - Smart sorting: Most Active, Most Recent, Last Hour/24H/Week, All Time
 - Displays repo name, git branch, timestamp, and message count per session
 - One-click resume command to clipboard (`Cmd+R` to refresh)
-- 100% local—no external communication
+- **Settings** - configure custom Claude projects directory (`Cmd+,`)
+- Visual copy feedback with checkmark confirmation
+- About dialog with version info
+- 100% local - no external communication
 
 ## Requirements
 
@@ -50,8 +54,10 @@ Find your identity with: `security find-identity -v -p codesigning`
 
 1. Launch `CCHistory.app`
 2. Click menu bar icon to view sessions
-3. Select sort option from menu or use `Cmd+1` through `Cmd+6`
-4. Click session to copy resume command, then paste in terminal
+3. **Search**: Type in the search field to filter by name, project, branch, or content
+4. **Sort**: Select sort option from menu or use `Cmd+1` through `Cmd+6`
+5. **Settings**: Press `Cmd+,` to configure custom Claude directory
+6. Click session to copy resume command, then paste in terminal
 
 ## Privacy
 
