@@ -13,6 +13,14 @@ struct CCHistory: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate {
+  // MARK: - Configuration
+  /// Maximum number of sessions to display in the menu at once
+  private static let maxSessionsToDisplay = 10
+  /// Maximum number of search results to show when filtering
+  private static let maxSearchResults = 10
+  /// Number of sessions to load for the search index (should be > maxSessionsToDisplay for good search coverage)
+  private static let sessionsForSearchIndex = 200
+
   var statusItem: NSStatusItem?
   var historyParser = HistoryParser()
   var sessions: [Session] = []
@@ -73,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     isLoading = true
 
     let sortOption = currentSortOption
+    let searchIndexLimit = Self.sessionsForSearchIndex
 
     // Get custom path from settings to respect user configuration
     let claudePathKey = "claudeProjectsPath"
@@ -80,10 +89,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     Task(priority: .userInitiated) {
       // Run parsing off the main actor
-      // Note: We fetch more sessions for search index (200) but display fewer
+      // Note: We fetch more sessions for search index (sessionsForSearchIndex) but display fewer (maxSessionsToDisplay)
       let parseResult = await Task.detached {
         let parser = HistoryParser(claudePath: customPath)
-        return parser.getSessionsWithIndex(sortOption: sortOption, limit: 200)
+        return parser.getSessionsWithIndex(sortOption: sortOption, limit: searchIndexLimit)
       }.value
 
       // Update UI on main actor
@@ -183,16 +192,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
       menu.addItem(loadingItem)
       sessionsToDisplay = []
     } else if cacheInvalidated && !isLoading {
-      // Cache invalidated but not loading, trigger load and use stale cache (max 10)
-      sessionsToDisplay = Array(cachedSessions.prefix(10))
+      // Cache invalidated but not loading, trigger load and use stale cache
+      sessionsToDisplay = Array(cachedSessions.prefix(Self.maxSessionsToDisplay))
       loadSessionsAsync()
     } else {
-      // Apply search filter with max 10 results
+      // Apply search filter with configurable limits
       if currentSearchQuery.isEmpty {
-        sessionsToDisplay = Array(cachedSessions.prefix(10))
+        sessionsToDisplay = Array(cachedSessions.prefix(Self.maxSessionsToDisplay))
       } else if let searchIndex = cachedSearchIndex {
         let matchingIds = searchIndex.search(currentSearchQuery)
-        sessionsToDisplay = cachedSessions.filter { matchingIds.contains($0.id) }.prefix(10).map { $0 }
+        sessionsToDisplay = cachedSessions.filter { matchingIds.contains($0.id) }.prefix(Self.maxSearchResults).map { $0 }
       } else {
         sessionsToDisplay = []
       }
