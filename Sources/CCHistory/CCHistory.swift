@@ -7,9 +7,7 @@ struct CCHistory: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
   var body: some Scene {
-    Settings {
-      EmptyView()
-    }
+    // Empty - no SwiftUI scenes needed, all UI is in AppDelegate
   }
 }
 
@@ -117,7 +115,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     searchViewItem.view = searchField
     menu.addItem(searchViewItem)
 
-    menu.addItem(NSMenuItem.separator())
+    // Add search action buttons for better UI
+    if !currentSearchQuery.isEmpty {
+      // Clear search button
+      let clearItem = NSMenuItem(
+        title: "✕ Clear Search",
+        action: #selector(clearSearch),
+        keyEquivalent: ""
+      )
+      clearItem.target = self
+      menu.addItem(clearItem)
+      menu.addItem(NSMenuItem.separator())
+    } else {
+      // Search hint button (only show when not searching)
+      let searchHintItem = NSMenuItem(
+        title: "💡 Search: names, projects, messages",
+        action: nil,
+        keyEquivalent: ""
+      )
+      searchHintItem.isEnabled = false
+      searchHintItem.indentationLevel = 1
+      menu.addItem(searchHintItem)
+      menu.addItem(NSMenuItem.separator())
+    }
 
     // Header with current sort option
     let headerTitle = "Claude Code History [\(currentSortOption.rawValue)]"
@@ -154,7 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     menu.addItem(sortMenuItem)
     menu.addItem(NSMenuItem.separator())
 
-    // Filter sessions based on search query
+    // Filter sessions based on search query - max 10 results
     let sessionsToDisplay: [Session]
     if isLoading && cachedSessions.isEmpty {
       // Show loading indicator
@@ -163,16 +183,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
       menu.addItem(loadingItem)
       sessionsToDisplay = []
     } else if cacheInvalidated && !isLoading {
-      // Cache invalidated but not loading, trigger load and use stale cache
-      sessionsToDisplay = cachedSessions.isEmpty ? [] : cachedSessions
+      // Cache invalidated but not loading, trigger load and use stale cache (max 10)
+      sessionsToDisplay = Array(cachedSessions.prefix(10))
       loadSessionsAsync()
     } else {
-      // Apply search filter
+      // Apply search filter with max 10 results
       if currentSearchQuery.isEmpty {
-        sessionsToDisplay = cachedSessions
+        sessionsToDisplay = Array(cachedSessions.prefix(10))
       } else if let searchIndex = cachedSearchIndex {
         let matchingIds = searchIndex.search(currentSearchQuery)
-        sessionsToDisplay = cachedSessions.filter { matchingIds.contains($0.id) }
+        sessionsToDisplay = cachedSessions.filter { matchingIds.contains($0.id) }.prefix(10).map { $0 }
       } else {
         sessionsToDisplay = []
       }
@@ -330,6 +350,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     // Invalidate cache and reload
     cacheInvalidated = true
     loadSessionsAsync()
+  }
+
+  @objc func clearSearch() {
+    currentSearchQuery = ""
   }
 
   @objc func refreshMenu() {
