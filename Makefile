@@ -87,8 +87,8 @@ notarize: build
 	@rm -f $(RELEASE_DIR)/$(BINARY_NAME).zip
 	@zip -r $(RELEASE_DIR)/$(BINARY_NAME).zip $(APP_NAME)
 
-# Create and push new GitHub release (increments version, creates zip, uploads to release)
-release: clean build
+# Create and push new GitHub release (increments version, notarizes, uploads to release)
+release: clean notarize
 	@echo "Preparing new release..."
 	@LATEST_VERSION=$$(gh release view --json tagName 2>/dev/null | jq -r '.tagName' | sed 's/v//'); \
 	if [ -z "$$LATEST_VERSION" ]; then \
@@ -99,15 +99,12 @@ release: clean build
 	NEW_TAG="v$$NEW_VERSION"; \
 	echo "Current version: $$LATEST_VERSION"; \
 	echo "New version: $$NEW_VERSION"; \
-	echo "Creating zip..."; \
-	mkdir -p $(RELEASE_DIR); \
-	zip -r $(RELEASE_DIR)/$(BINARY_NAME).zip $(APP_NAME); \
 	echo "Creating and pushing tag..."; \
 	git tag -a "$$NEW_TAG" -m "Release $$NEW_TAG"; \
 	git push origin "$$NEW_TAG"; \
 	echo "Creating GitHub release..."; \
 	gh release create "$$NEW_TAG" --title "$$NEW_TAG" --notes "Release $$NEW_TAG" $(RELEASE_DIR)/$(BINARY_NAME).zip; \
-	echo "Release $$NEW_TAG created with $(BINARY_NAME).zip!"
+	echo "Release $$NEW_TAG created with notarized $(BINARY_NAME).zip!"
 
 # Clean build artifacts
 clean:
@@ -135,7 +132,7 @@ help:
 	@echo "  make lint-fix   - Fix Swift formatting issues automatically"
 	@echo "  make test       - Run tests"
 	@echo "  make clean      - Remove build artifacts"
-	@echo "  make release    - Create new GitHub release (version bump + zip + upload)"
+	@echo "  make release    - Create new GitHub release (version bump + notarize + upload)"
 	@echo "  make run        - Build and run the application"
 	@echo "  make help       - Show this help message"
 	@echo "  make all        - Clean and build"
