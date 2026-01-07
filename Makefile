@@ -22,6 +22,9 @@ build:
 	@mkdir -p $(APP_NAME)/Contents/MacOS
 	@mkdir -p $(APP_NAME)/Contents/Resources
 	@cp $(BUILD_DIR)/release/$(BINARY_NAME) $(APP_NAME)/Contents/MacOS/
+	@if [ -f "$(BINARY_NAME).icns" ]; then \
+		cp $(BINARY_NAME).icns $(APP_NAME)/Contents/Resources/; \
+	fi
 	@sed -e 's/EXECUTABLE_NAME/$(BINARY_NAME)/g' \
 	     -e 's/BUNDLE_NAME/$(BINARY_NAME)/g' \
 	     -e 's/VERSION/$(VERSION)/g' \

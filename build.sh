@@ -23,8 +23,8 @@ mkdir -p CCHistory.app/Contents/MacOS
 mkdir -p CCHistory.app/Contents/Resources
 cp .build/release/CCHistory CCHistory.app/Contents/MacOS/
 
-# Note: Menu bar icon is now generated programmatically in IconData.swift
-# No need to copy icon files to Resources
+# Copy app icon to Resources
+cp CCHistory.icns CCHistory.app/Contents/Resources/
 
 # Create Info.plist
 cat > CCHistory.app/Contents/Info.plist << 'EOF'
@@ -44,6 +44,8 @@ cat > CCHistory.app/Contents/Info.plist << 'EOF'
   <string>0.0.1</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <key>CFBundleIconFile</key>
+  <string>CCHistory</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>LSUIElement</key>
