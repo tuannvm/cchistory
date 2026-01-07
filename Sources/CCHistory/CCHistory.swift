@@ -115,47 +115,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     // Add search field at the top
     let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 250, height: 24))
-    searchField.placeholderString = "Search sessions..."
+    searchField.placeholderString = "Search..."
     searchField.stringValue = currentSearchQuery
     searchField.delegate = self
     searchField.target = self
+    searchField.action = #selector(searchFieldAction(_:))
 
     let searchViewItem = NSMenuItem()
     searchViewItem.view = searchField
     menu.addItem(searchViewItem)
 
-    // Add search action buttons for better UI
-    if !currentSearchQuery.isEmpty {
-      // Clear search button
-      let clearItem = NSMenuItem(
-        title: "✕ Clear Search",
-        action: #selector(clearSearch),
-        keyEquivalent: ""
-      )
-      clearItem.target = self
-      menu.addItem(clearItem)
-      menu.addItem(NSMenuItem.separator())
-    } else {
-      // Search hint button (only show when not searching)
-      let searchHintItem = NSMenuItem(
-        title: "💡 Search: names, projects, messages",
-        action: nil,
-        keyEquivalent: ""
-      )
-      searchHintItem.isEnabled = false
-      searchHintItem.indentationLevel = 1
-      menu.addItem(searchHintItem)
-      menu.addItem(NSMenuItem.separator())
-    }
-
-    // Header with current sort option
-    let headerTitle = "Claude Code History [\(currentSortOption.rawValue)]"
-    let headerItem = NSMenuItem(title: headerTitle, action: nil, keyEquivalent: "")
-    headerItem.attributedTitle = NSAttributedString(
-      string: headerTitle,
-      attributes: [.font: NSFont.boldSystemFont(ofSize: 13)]
-    )
-    menu.addItem(headerItem)
     menu.addItem(NSMenuItem.separator())
 
     // Sort options submenu
@@ -421,6 +390,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     guard let searchField = obj.object as? NSSearchField else { return }
     currentSearchQuery = searchField.stringValue
   }
+
+  @objc func searchFieldAction(_ sender: NSSearchField) {
+    // Handle cancel button click in search field
+    if sender.stringValue.isEmpty {
+      currentSearchQuery = ""
+    }
+  }
 }
 
 /// Custom NSMenuItem that stores session data
@@ -430,39 +406,35 @@ final class SessionMenuItem: NSMenuItem {
   init(session: Session, isCopied: Bool = false) {
     self.session = session
 
-    let repoName = session.repoName
-    let branch = session.gitBranch.map { " [\($0)]" } ?? ""
-    let count = session.messageCount
-    let timeAgo = session.formattedRelativeDate
     let displayName = session.cleanedDisplayName
+    let repoName = session.repoName
 
     let title: String
     if isCopied {
-      title = "✓ Copied: \(repoName): \(displayName)"
+      title = "Copied — \(displayName)"
     } else {
-      title = "\(repoName): \(displayName)\(branch) • \(timeAgo) (\(count) msgs)"
+      title = "\(displayName) — \(repoName)"
     }
 
     super.init(title: title, action: nil, keyEquivalent: "")
 
     let tooltip = """
-      Project: \(session.projectPath.isEmpty ? "None" : session.projectPath)
       Session: \(displayName)
-      Time: \(session.formattedDate)
-      Messages: \(count)
+      Repository: \(repoName)
       Branch: \(session.gitBranch ?? "N/A")
+      Time: \(session.formattedRelativeDate) (\(session.messageCount) messages)
 
       Click to copy resume command
       """
     self.toolTip = tooltip
 
-    // Add visual feedback for copied state
+    // Add visual feedback for copied state using system accent color
     if isCopied {
       self.attributedTitle = NSAttributedString(
         string: title,
         attributes: [
-          .foregroundColor: NSColor.systemGreen,
-          .font: NSFont.boldSystemFont(ofSize: 13),
+          .foregroundColor: NSColor.controlAccentColor,
+          .font: NSFont.systemFont(ofSize: 13),
         ]
       )
     }
