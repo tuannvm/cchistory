@@ -18,7 +18,7 @@ final class SettingsWindow: NSPanel {
   init() {
     super.init(
       contentRect: NSRect(x: 0, y: 0, width: 600, height: 240),
-      styleMask: [.titled, .closable],
+      styleMask: [.titled, .closable, .fullSizeContentView],
       backing: .buffered,
       defer: false
     )
@@ -26,16 +26,35 @@ final class SettingsWindow: NSPanel {
     self.title = "CCHistory Settings"
     self.isFloatingPanel = false
     self.isMovableByWindowBackground = true
+    self.titlebarAppearsTransparent = true
 
     setupUI()
     loadSavedPath()
   }
 
   private func setupUI() {
+    // Create visual effect view for glass background
+    let visualEffectView = NSVisualEffectView()
+    visualEffectView.translatesAutoresizingMaskIntoConstraints = false
+    visualEffectView.material = .hudWindow
+    visualEffectView.blendingMode = .behindWindow
+    visualEffectView.state = .active
+
+    self.contentViewController = NSViewController()
+    self.contentViewController?.view = visualEffectView
+
+    // Container view for content
     let contentView = NSView()
     contentView.translatesAutoresizingMaskIntoConstraints = false
-    self.contentViewController = NSViewController()
-    self.contentViewController?.view = contentView
+    visualEffectView.addSubview(contentView)
+
+    // Pin content view to visual effect view
+    NSLayoutConstraint.activate([
+      contentView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
+      contentView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
+      contentView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
+      contentView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor),
+    ])
 
     // Title label
     let titleLabel = NSTextField(labelWithString: "Claude Projects Directory")

@@ -7,7 +7,7 @@ final class AboutWindow: NSPanel {
   init() {
     super.init(
       contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
-      styleMask: [.titled, .closable],
+      styleMask: [.titled, .closable, .fullSizeContentView],
       backing: .buffered,
       defer: false
     )
@@ -15,19 +15,34 @@ final class AboutWindow: NSPanel {
     self.title = "About CCHistory"
     self.isFloatingPanel = false
     self.isMovableByWindowBackground = true
-    self.backgroundColor = NSColor.windowBackgroundColor
+    self.titlebarAppearsTransparent = true
 
     setupUI()
   }
 
   private func setupUI() {
-    let contentView = NSView()
-    contentView.translatesAutoresizingMaskIntoConstraints = false
-    contentView.wantsLayer = true
-    contentView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+    // Create visual effect view for glass background
+    let visualEffectView = NSVisualEffectView()
+    visualEffectView.translatesAutoresizingMaskIntoConstraints = false
+    visualEffectView.material = .hudWindow
+    visualEffectView.blendingMode = .behindWindow
+    visualEffectView.state = .active
 
     self.contentViewController = NSViewController()
-    self.contentViewController?.view = contentView
+    self.contentViewController?.view = visualEffectView
+
+    // Container view for content
+    let contentView = NSView()
+    contentView.translatesAutoresizingMaskIntoConstraints = false
+    visualEffectView.addSubview(contentView)
+
+    // Pin content view to visual effect view
+    NSLayoutConstraint.activate([
+      contentView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
+      contentView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
+      contentView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
+      contentView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor),
+    ])
 
     // App icon
     let iconView = NSImageView()
