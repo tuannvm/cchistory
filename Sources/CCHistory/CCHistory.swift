@@ -28,7 +28,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   var sessions: [Session] = []
   var currentSortOption: SessionSortOption = .mostActive
   private var settingsWindow: SettingsWindow?
-  private var aboutWindow: AboutWindow?
 
   // Async loading state
   private var cachedSessions: [Session] = []
@@ -257,12 +256,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   }
 
   @objc func showAboutDialog() {
-    if aboutWindow == nil {
-      aboutWindow = AboutWindow()
+    if let url = URL(string: "https://github.com/tuannvm/cchistory") {
+      NSWorkspace.shared.open(url)
     }
-
-    aboutWindow?.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
   }
 
   @objc func openSettings() {
