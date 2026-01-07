@@ -116,6 +116,7 @@ Highlight matching text in search results for better visibility.
 |---------|--------|------------|--------|
 | Async Loading | High | Medium | [Done] |
 | Search | High | Medium | [Done] |
+| Clear Search & Result Limits | Medium | Low | [Done] |
 | Custom Path (UI) | Medium | Low | [Done] |
 | About Dialog | Low | Low | [Done] |
 | Improved Copy Feedback | Medium | Low | [Done] |
@@ -124,11 +125,27 @@ Highlight matching text in search results for better visibility.
 
 ## Recent Improvements (January 2026)
 
+### Feature: Clear Search & Result Limits [COMPLETED]
+
+Enhanced the search experience with better UX controls.
+
+### What Was Built
+- **ESC to clear**: Press ESC key in search field to instantly clear the search query
+- **Result capping**: Limited display to 10 sessions (`maxSessionsToDisplay`) and 10 search results (`maxSearchResults`)
+- **Configurable limits**: Extracted session limits into constants (`sessionsForSearchIndex = 200` for index)
+- **Simplified UI**: Removed redundant header and LLM tip for cleaner menu
+- **Improved search placeholder**: Changed from "Search sessions..." to "Search..."
+
+### Implementation
+See `CCHistory.swift:17-22` for constants and `CCHistory.swift:122-133` for search field configuration.
+
+---
+
 ### Code Quality & Bug Fixes
 - **Search index limit increased**: From 50 to 200 sessions for better coverage
 - **Fixed redundant search handlers**: Removed duplicate NSSearchField action handler, keeping only delegate method
 - **Removed dead code**: Cleaned up unused `getCurrentPath()` method in SettingsWindow
-- **Swift 6 concurrency**: Added `@preconcurrency` import for UserNotifications to eliminate warnings
+- **Swift 6 concurrency**: Updated to Swift 6.2, removed UserNotifications dependency
 - **Clean build**: Zero compiler warnings achieved
 - **Test coverage**: Added comprehensive tests for SearchIndex functionality
 

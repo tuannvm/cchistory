@@ -2,11 +2,26 @@
 
 ## Prerequisites
 
-- Swift 5.9+
+- Swift 6.2+
 - macOS 13.0+
 - Apple Developer account (for code signing)
 
 ## Building
+
+### Using Makefile (Recommended)
+
+```bash
+# Build and sign app bundle
+make build
+
+# Run the application
+make run
+
+# Clean build artifacts
+make clean
+```
+
+### Using Swift Package Manager
 
 ```bash
 # Set your code signing identity
@@ -15,23 +30,40 @@ export DEVELOPER_IDENTITY="<your-certificate-identity>"
 # Build
 swift build -c release
 
-# Or use the build script
-./build.sh
-```
-
-Find available identities with: `security find-identity -v -p codesigning`
-
-## Running
-
-```bash
+# Run directly (for development)
 swift run CCHistory
 ```
+
+### Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | Build and sign app bundle |
+| `make lint` | Run Swift formatting checks |
+| `make lint-fix` | Fix Swift formatting issues automatically |
+| `make test` | Run tests with code coverage |
+| `make notarize` | Build, sign, and notarize app for Gatekeeper |
+| `make release` | Create new GitHub release (version bump + notarize + upload) |
+| `make clean` | Remove build artifacts |
+| `make run` | Build and run the application |
+| `make help` | Show all available targets with descriptions |
+
+Find your code signing identity with: `security find-identity -v -p codesigning`
 
 ## Testing
 
 ```bash
-swift test
+# Run all tests
+make test
+
+# Or using swift directly
+swift test --enable-code-coverage
 ```
+
+**Test files:**
+- `Tests/CCHistoryTests/CCHistoryTests.swift` - Main app tests
+- `Tests/CCHistoryTests/HistoryParserTests.swift` - Session parsing tests
+- `Tests/CCHistoryTests/SearchIndexTests.swift` - Search functionality tests
 
 ## Project Structure
 

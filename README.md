@@ -44,20 +44,36 @@ Grab the latest `CCHistory.zip` from [Releases](https://github.com/tuannvm/cchis
 ```bash
 git clone https://github.com/tuannvm/cchistory.git
 cd cchistory
+
+# Using Makefile (recommended)
+make build
+
+# Or using the build script
 export DEVELOPER_IDENTITY="<your-certificate-identity>"
 ./build.sh
 ```
 
-Find your identity with: `security find-identity -v -p codesigning`
+Find your code signing identity with: `security find-identity -v -p codesigning`
+
+**Available Makefile targets:**
+- `make build` - Build and sign app bundle
+- `make lint` - Run Swift formatting checks
+- `make test` - Run tests
+- `make notarize` - Build, sign, and notarize app for Gatekeeper
+- `make release` - Create new GitHub release (version bump + notarize + upload)
+- `make clean` - Remove build artifacts
+- `make run` - Build and run the application
+- `make help` - Show all available targets
 
 ## Usage
 
 1. Launch `CCHistory.app`
 2. Click menu bar icon to view sessions
-3. **Search**: Type in the search field to filter by name, project, branch, or content
+3. **Search**: Type in the search field to filter by name, project, branch, or content (press ESC to clear)
 4. **Sort**: Select sort option from menu or use `Cmd+1` through `Cmd+6`
 5. **Settings**: Press `Cmd+,` to configure custom Claude directory
 6. Click session to copy resume command, then paste in terminal
+7. **Refresh**: Press `Cmd+R` to reload sessions
 
 ## Privacy
 

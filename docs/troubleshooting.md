@@ -16,9 +16,10 @@
 
 **Solutions:**
 - Ensure Xcode or Swift toolchain is installed: `xcode-select -p`
-- Ensure `DEVELOPER_IDENTITY` is set: `echo $DEVELOPER_IDENTITY`
+- Ensure `DEVELOPER_IDENTITY` is set (for Makefile): `echo $DEVELOPER_IDENTITY`
 - Find your identity: `security find-identity -v -p codesigning`
 - Try verbose build: `swift build --verbose`
+- Try using Makefile: `make build`
 
 ## Git branch not showing
 
@@ -55,3 +56,14 @@
 - Verify session ID is valid: `ls ~/.claude/projects/*/SESSION_ID.jsonl`
 - Ensure project path exists: `cd "PROJECT_PATH"`
 - Check Claude Code is installed: `which claude`
+
+## Search not working
+
+**Symptoms:** Search returns no results even though sessions exist.
+
+**Solutions:**
+- Check if search index is built: Search works after initial load completes (wait for "Loading..." to disappear)
+- Press ESC to clear search field: Sometimes cached search query persists
+- Refresh menu with Cmd+R: This rebuilds the search index
+- Check session limit: Only first 200 sessions are indexed for search
+- Verify search query: Search is case-insensitive and matches names, paths, branches, and message content
