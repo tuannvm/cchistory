@@ -39,9 +39,11 @@ swift test
 cchistory/
 ├── Sources/
 │   └── CCHistory/
-│       ├── CCHistory.swift      # Main app and menu bar logic
-│       ├── HistoryParser.swift  # Parses session files
-│       └── Session.swift        # Session data model
+│       ├── CCHistory.swift      # Main app, menu bar logic, search handling
+│       ├── HistoryParser.swift  # Parses session files with search index
+│       ├── SearchIndex.swift    # In-memory search index
+│       ├── Session.swift        # Session data model
+│       └── SettingsWindow.swift # Settings UI for custom path
 ├── Assets.xcassets/             # App icons
 ├── docs/                        # Documentation
 ├── Package.swift                # Swift Package manifest
@@ -51,20 +53,32 @@ cchistory/
 ## How It Works
 
 ```
-~/.claude/projects/
+~/.claude/projects/ (or custom path from Settings)
   └── <sanitized-project-path>/     (e.g., "Users-username-Projects-repo")
       └── <session-id>.jsonl         (JSONL file with messages)
 
-HistoryParser.parseSessionsFromProjects()
+HistoryParser.parseSessionsWithIndex()
   → Scans project directories
   → Parses each .jsonl file for summary + timestamps
-  → Extracts git info via shell commands
-  → Returns [Session] sorted by criteria
+  → Extracts message content for search index
+  → Builds SearchIndex with session metadata
+  → Returns ParseResult (sessions + searchIndex)
+  → Extracts git info via Process calls
 
 AppDelegate.buildMenu()
+  → Shows NSSearchField at top (live filtering)
   → Gets sessions from HistoryParser
+  → Applies search filter if query exists
   → Creates NSMenu with NSMenuItems
   → Each click copies resume command to clipboard
+  → Shows "✓ Copied" visual feedback for 1.5s
+
+SettingsWindow
+  → NSPanel with path text field
+  → Browse button for directory picker
+  → Validates path and shows errors
+  → Saves to UserDefaults on Apply
+  → Triggers re-parse on path change
 ```
 
 ### Session File Format
@@ -75,6 +89,17 @@ Claude Code stores sessions as JSONL files. Each line is a JSON object:
 - `type: "assistant"` - Assistant message with `timestamp`
 
 **Critical:** Timestamps use format `yyyy-MM-dd'T'HH:mm:ss.SSS'Z'` - standard `ISO8601DateFormatter` doesn't handle fractional seconds, so a custom `DateFormatter` is used.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `CCHistory.swift` | Main app entry point, `@main` struct, `AppDelegate` with menu bar, search, and settings logic |
+| `HistoryParser.swift` | Parses `~/.claude/projects/*/*.jsonl` files, extracts git info via `Process`, builds search index |
+| `SearchIndex.swift` | In-memory search index for fast session lookup across names, paths, and message content |
+| `Session.swift` | Data models (`Session`, `SessionSortOption`, `TimeFilter`) with computed properties |
+| `SettingsWindow.swift` | `NSPanel` for configuring custom Claude projects directory with validation |
+| `build.sh` | Build script that requires `DEVELOPER_IDENTITY` env var |
 
 ### Git Integration
 
@@ -192,6 +217,89 @@ The cache is invalidated in these scenarios:
 | Last 24 Hours | Active in past day | ⌘+4 |
 | Last Week | Active in past 7 days | ⌘+5 |
 | All Time | All sessions by recency | ⌘+6 |
+
+## Search
+
+CCHistory provides instant search across all conversation history using an in-memory index built during parsing.
+
+### Search Architecture
+
+```
+SearchIndex struct
+  ├── indexedSessions: [IndexedSession]    // All indexed sessions
+  └── maxMessagesToIndex: Int              // Configurable (default: 15)
+
+IndexedSession
+  ├── sessionId: String                    // Maps to Session.id
+  └── searchableText: String               // Lowercased concatenated content
+
+Search Flow:
+1. Parse sessions: HistoryParser builds index from messages
+2. User types: NSSearchFieldDelegate triggers rebuild
+3. Filter: cachedSessions filtered by matching IDs
+4. Display: Menu shows only matching sessions
+```
+
+### Indexed Content
+
+Each session's searchable text includes:
+- Session name (summary) - lowercased
+- Project path - lowercased
+- Git repository name - lowercased
+- Git branch - lowercased
+- Last N messages (default: 15) - lowercased
+
+### Performance
+
+- **Index build**: During `parseSessionsWithIndex()` - O(n) where n = total messages
+- **Search query**: O(m) substring search where m = indexed sessions
+- **UI update**: Filtered sessions rebuild menu instantly
+
+### Search Implementation
+
+See `SearchIndex.swift:58-71` for the search algorithm:
+```swift
+func search(_ query: String) -> Set<String> {
+    // Case-insensitive substring search
+    // Returns set of matching session IDs
+}
+```
+
+## Settings Window
+
+The Settings window (`SettingsWindow.swift`) allows users to configure a custom Claude projects directory.
+
+### Features
+
+- **Path validation**: Checks path exists, is directory, and contains `projects/` subdirectory
+- **Browse button**: `NSOpenPanel` for directory selection
+- **Reset to default**: Restores `~/.claude` path
+- **Persistence**: Uses `UserDefaults` with key `claudeProjectsPath`
+- **Security**: Path validation for dangerous characters before applying
+
+### Settings Flow
+
+```
+1. User opens Settings (Cmd+,)
+2. SettingsWindow loads saved path from UserDefaults
+3. User modifies path (manual entry or browse)
+4. Real-time validation shows errors/warnings
+5. Apply button:
+   a. Saves to UserDefaults
+   b. Calls onPathChanged callback
+   c. AppDelegate recreates HistoryParser
+   d. Invalidates cache and triggers reload
+6. Window closes after 2s
+```
+
+### Security
+
+Path validation in `HistoryParser.init()`:
+- Rejects paths with shell metacharacters: `$`;`\`&|()\n\r\t`
+- Uses `NSString.standardizingPath` to resolve `..` and prevent traversal
+- Falls back to `~/.claude` if invalid
+
+See `HistoryParser.swift:12-24` for validation logic.
 
 ## Release Process
 
