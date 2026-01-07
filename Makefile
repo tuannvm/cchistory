@@ -68,6 +68,7 @@ test:
 # Notarize the app (requires build first)
 notarize: build
 	@echo "Creating zip for notarization..."
+	@mkdir -p $(RELEASE_DIR)
 	@zip -r $(RELEASE_DIR)/$(BINARY_NAME).zip $(APP_NAME)
 	@echo "Submitting to Apple notary service..."
 	@if [ -n "$$NOTARY_APPLE_ID" ] && [ -n "$$NOTARY_PASSWORD" ] && [ -n "$$NOTARY_TEAM_ID" ]; then \
