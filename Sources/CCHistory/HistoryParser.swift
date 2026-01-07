@@ -57,10 +57,13 @@ final class HistoryParser {
       }
 
       // Extract project path from directory name (unescape)
-      // Encoding: "--" = "/." (slash + dot), "-" = "/"
+      // Encoding: "-" replaces "/" in paths
+      // Hidden directories (like .config) lose their leading dot, creating "//" when decoded
+      // We fix this specific pattern by restoring dots after double slashes
+      // Note: This doesn't fix hyphens in directory names - that requires knowing the actual encoding scheme
       let projectPath = projectDir
-        .replacingOccurrences(of: "--", with: "/.")
         .replacingOccurrences(of: "-", with: "/")
+        .replacingOccurrences(of: "//", with: "/.")
 
       for sessionFile in sessionFiles {
         // Only process .jsonl session files
