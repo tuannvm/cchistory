@@ -91,7 +91,7 @@ final class SettingsWindow: NSPanel {
 
       // Browse button
       browseButton.centerYAnchor.constraint(equalTo: pathTextField.centerYAnchor),
-      browseButton.leadingAnchor.constraint(equalTo: resetButton.leadingAnchor),
+      browseButton.leadingAnchor.constraint(equalTo: pathTextField.trailingAnchor, constant: 10),
       browseButton.widthAnchor.constraint(equalToConstant: 90),
 
       // Reset button

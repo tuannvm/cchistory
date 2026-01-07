@@ -252,17 +252,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     menu.addItem(NSMenuItem.separator())
 
-    // LLM Naming info item
-    let llmInfoItem = NSMenuItem(
-      title: "💡 Tip: Rename unnamed sessions via LLM",
-      action: #selector(showLLMNamingHelp),
-      keyEquivalent: "?"
-    )
-    llmInfoItem.target = self
-    menu.addItem(llmInfoItem)
-
-    menu.addItem(NSMenuItem.separator())
-
     // Refresh button
     let refreshItem = NSMenuItem(
       title: "Refresh", action: #selector(refreshMenu), keyEquivalent: "r")
@@ -287,27 +276,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
       loadSessionsAsync()
       buildMenu()
     }
-  }
-
-  @objc func showLLMNamingHelp() {
-    let alert = NSAlert()
-    alert.messageText = "About Session Naming"
-    alert.informativeText = """
-      Sessions are named automatically from your Claude Code history.
-
-      • If a session has a clear name from your prompts, it will be displayed
-      • Command-like entries (/model, /help, etc.) show as "Unnamed Session"
-      • Very long names are truncated to 50 characters
-
-      Future Enhancement:
-      We plan to add optional LLM-based naming (using local Ollama) to generate
-      descriptive names for unnamed sessions based on their conversation content.
-
-      For now, you can identify sessions by their project, branch, and timestamp.
-      """
-    alert.alertStyle = .informational
-    alert.addButton(withTitle: "Got it")
-    alert.runModal()
   }
 
   @objc func showAboutDialog() {
