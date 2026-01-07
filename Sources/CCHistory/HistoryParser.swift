@@ -56,7 +56,9 @@ final class HistoryParser {
         continue
       }
 
-      // Extract project path from directory name (unescape: "-" -> "/")
+      // Extract project path from directory name (fallback only)
+      // Note: The actual path is read from the session file's "cwd" field.
+      // This decoding is only used as a fallback if cwd is not available.
       let projectPath = projectDir.replacingOccurrences(of: "-", with: "/")
 
       for sessionFile in sessionFiles {
@@ -106,6 +108,7 @@ final class HistoryParser {
     var messageCount = 0
     var messages: [String] = []
     var hasCapturedSummary = false
+    var actualProjectPath: String?
 
     // Custom date formatter for ISO8601 with fractional seconds
     let formatter = DateFormatter()
@@ -118,6 +121,11 @@ final class HistoryParser {
         let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]
       else {
         continue
+      }
+
+      // Extract actual project path from "cwd" field in user messages
+      if actualProjectPath == nil, let cwd = json["cwd"] as? String, !cwd.isEmpty {
+        actualProjectPath = cwd
       }
 
       // Extract summary from "summary" entries
@@ -182,12 +190,15 @@ final class HistoryParser {
       return nil
     }
 
+    // Use actual path from session file if available, otherwise fall back to decoded path
+    let finalProjectPath = actualProjectPath ?? projectPath
+
     let session = Session(
       id: UUID().uuidString,
       sessionId: sessionId,
       displayName: summary,
       timestamp: Date(timeIntervalSince1970: latestTimestamp),
-      projectPath: projectPath,
+      projectPath: finalProjectPath,
       messageCount: max(1, messageCount)
     )
 

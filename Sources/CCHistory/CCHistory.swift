@@ -65,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     // Trigger initial async load
     loadSessionsAsync()
+    // Build menu immediately to show loading indicator
+    buildMenu()
 
     // Refresh menu every 30 seconds
     Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
