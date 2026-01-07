@@ -56,8 +56,11 @@ final class HistoryParser {
         continue
       }
 
-      // Extract project path from directory name (unescape: "-" -> "/")
-      let projectPath = projectDir.replacingOccurrences(of: "-", with: "/")
+      // Extract project path from directory name (unescape)
+      // Encoding: "--" = "/." (slash + dot), "-" = "/"
+      let projectPath = projectDir
+        .replacingOccurrences(of: "--", with: "/.")
+        .replacingOccurrences(of: "-", with: "/")
 
       for sessionFile in sessionFiles {
         // Only process .jsonl session files
