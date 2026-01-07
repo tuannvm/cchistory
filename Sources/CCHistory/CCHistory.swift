@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   var sessions: [Session] = []
   var currentSortOption: SessionSortOption = .mostActive
   private var settingsWindow: SettingsWindow?
+  private var aboutWindow: AboutWindow?
 
   // Async loading state
   private var cachedSessions: [Session] = []
@@ -248,31 +249,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   }
 
   @objc func showAboutDialog() {
-    let alert = NSAlert()
-    alert.messageText = "CCHistory"
-    alert.informativeText = """
-      Claude Code Conversation History Menu Bar App
+    if aboutWindow == nil {
+      aboutWindow = AboutWindow()
+    }
 
-      Version: 1.0.0
-      Website: github.com/tuannvm/cchistory
-
-      CCHistory provides quick access to your Claude Code conversation
-      history directly from the menu bar. Click any session to copy its
-      resume command to the clipboard.
-
-      Features:
-      • Search across session names and message content
-      • Sort by activity, recency, or time period
-      • Copy resume commands with one click
-      • Async loading for optimal performance
-      • Custom Claude projects directory support
-
-      © 2024
-      """
-    alert.alertStyle = .informational
-    alert.addButton(withTitle: "OK")
-
-    alert.runModal()
+    aboutWindow?.makeKeyAndOrderFront(nil)
+    NSApp.activate(ignoringOtherApps: true)
   }
 
   @objc func openSettings() {

@@ -60,29 +60,15 @@ final class AboutWindow: NSPanel {
     versionLabel.backgroundColor = .clear
     contentView.addSubview(versionLabel)
 
-    // Links container (Website, GitHub)
-    let linksStack = NSStackView()
-    linksStack.orientation = .horizontal
-    linksStack.spacing = 20
-    linksStack.translatesAutoresizingMaskIntoConstraints = false
-    contentView.addSubview(linksStack)
-
-    // Website link
-    let websiteButton = NSButton(title: "Website", target: self, action: #selector(openWebsite))
-    websiteButton.isBordered = false
-    websiteButton.focusRingType = .none
-    styleLinkButton(websiteButton)
-    linksStack.addArrangedSubview(websiteButton)
-
     // GitHub link
-    let githubButton = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
+    let githubButton = NSButton(title: "github.com/tuannvm/cchistory", target: self, action: #selector(openGitHub))
     githubButton.isBordered = false
     githubButton.focusRingType = .none
     styleLinkButton(githubButton)
-    linksStack.addArrangedSubview(githubButton)
+    contentView.addSubview(githubButton)
 
     // Description
-    let descLabel = NSTextField(labelWithString: "Claude Code conversation history\nmenu bar application.")
+    let descLabel = NSTextField(labelWithString: "Claude Code conversation history, accessible from the menu bar.")
     descLabel.font = NSFont.systemFont(ofSize: 12)
     descLabel.textColor = NSColor.labelColor
     descLabel.alignment = .center
@@ -92,13 +78,9 @@ final class AboutWindow: NSPanel {
     descLabel.backgroundColor = .clear
     contentView.addSubview(descLabel)
 
-    // Features list
+    // Features - simplified without bullets
     let featuresLabel = NSTextField(labelWithString: """
-    Features:
-    • Search across sessions
-    • Sort by activity/recency
-    • Copy resume commands
-    • Custom path support
+    Search sessions — Sort by activity or recency — Copy resume commands
     """)
     featuresLabel.font = NSFont.systemFont(ofSize: 11)
     featuresLabel.textColor = NSColor.secondaryLabelColor
@@ -109,8 +91,9 @@ final class AboutWindow: NSPanel {
     featuresLabel.backgroundColor = .clear
     contentView.addSubview(featuresLabel)
 
-    // Copyright
-    let copyrightLabel = NSTextField(labelWithString: "© 2024")
+    // Copyright - dynamic year
+    let currentYear = Calendar.current.component(.year, from: Date())
+    let copyrightLabel = NSTextField(labelWithString: "© \(currentYear)")
     copyrightLabel.font = NSFont.systemFont(ofSize: 11)
     copyrightLabel.textColor = NSColor.tertiaryLabelColor
     copyrightLabel.alignment = .center
@@ -134,12 +117,12 @@ final class AboutWindow: NSPanel {
       versionLabel.topAnchor.constraint(equalTo: appNameLabel.bottomAnchor, constant: 4),
       versionLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
-      // Links
-      linksStack.topAnchor.constraint(equalTo: versionLabel.bottomAnchor, constant: 16),
-      linksStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+      // GitHub link
+      githubButton.topAnchor.constraint(equalTo: versionLabel.bottomAnchor, constant: 12),
+      githubButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
       // Description
-      descLabel.topAnchor.constraint(equalTo: linksStack.bottomAnchor, constant: 24),
+      descLabel.topAnchor.constraint(equalTo: githubButton.bottomAnchor, constant: 24),
       descLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
       descLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 20),
       descLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
@@ -167,12 +150,6 @@ final class AboutWindow: NSPanel {
         .paragraphStyle: paragraphStyle,
       ]
     )
-  }
-
-  @objc private func openWebsite() {
-    if let url = URL(string: "https://github.com/tuannvm/cchistory") {
-      NSWorkspace.shared.open(url)
-    }
   }
 
   @objc private func openGitHub() {
