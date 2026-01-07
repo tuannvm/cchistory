@@ -2,80 +2,82 @@ import AppKit
 
 extension NSImage {
   static let cchistoryLogo: NSImage = {
-    // Create image with proper size for menu bar
+    // Create high-resolution image for Retina displays
     let size = NSSize(width: 22, height: 22)
     let image = NSImage(size: size)
-    image.isTemplate = false  // Important: preserve colors
+    image.isTemplate = true  // Template icon: adapts to system theme
 
     image.lockFocus()
 
-    // Fill entire background with dark color first
-    NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0).setFill()
-    NSBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
+    // Enable anti-aliasing for smooth edges
+    NSGraphicsContext.current?.imageInterpolation = .high
 
-    // Draw rounded square background (dark)
-    let rect = CGRect(x: 1, y: 1, width: 20, height: 20)
-    let path = NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5)
-    NSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0).setFill()
-    path.fill()
+    // Draw speech bubble outline with clock inside
+    // Using clean stroke-based design for better template icon rendering
 
-    // Draw speech bubble (orange)
+    // Speech bubble outline (black stroke)
     let bubblePath = NSBezierPath()
-    bubblePath.move(to: NSPoint(x: 5, y: 6))
-    bubblePath.line(to: NSPoint(x: 17, y: 6))
-    bubblePath.line(to: NSPoint(x: 19, y: 8))
-    bubblePath.line(to: NSPoint(x: 19, y: 13))
-    bubblePath.line(to: NSPoint(x: 17, y: 15))
+    bubblePath.move(to: NSPoint(x: 4, y: 5))
+    bubblePath.line(to: NSPoint(x: 18, y: 5))
+    bubblePath.line(to: NSPoint(x: 18, y: 12))
+    bubblePath.line(to: NSPoint(x: 15, y: 15))
     bubblePath.line(to: NSPoint(x: 11, y: 15))
     bubblePath.line(to: NSPoint(x: 11, y: 17))
-    bubblePath.line(to: NSPoint(x: 7, y: 15))
-    bubblePath.line(to: NSPoint(x: 3, y: 15))
-    bubblePath.line(to: NSPoint(x: 3, y: 8))
+    bubblePath.line(to: NSPoint(x: 8, y: 15))
+    bubblePath.line(to: NSPoint(x: 4, y: 15))
     bubblePath.close()
 
-    NSColor(red: 0.85, green: 0.47, blue: 0.34, alpha: 1.0).setFill()
-    bubblePath.fill()
+    NSColor(white: 0, alpha: 1.0).setStroke()
+    bubblePath.lineWidth = 1.5
+    bubblePath.stroke()
 
-    // Draw clock circle (dark)
-    let clockRect = CGRect(x: 8, y: 8, width: 6, height: 6)
+    // Clock circle (outline)
+    let clockRect = CGRect(x: 7, y: 7, width: 8, height: 8)
     let clockPath = NSBezierPath(ovalIn: clockRect)
-    NSColor(white: 0.1, alpha: 0.9).setFill()
-    clockPath.fill()
+    NSColor(white: 0, alpha: 1.0).setStroke()
+    clockPath.lineWidth = 1.2
+    clockPath.stroke()
 
-    // Draw clock hands
-    NSColor(red: 0.85, green: 0.47, blue: 0.34, alpha: 1.0).setStroke()
+    // Clock hands
     let clockCenter = NSPoint(x: 11, y: 11)
 
-    let handPath = NSBezierPath()
-    handPath.move(to: clockCenter)
-    handPath.line(to: NSPoint(x: 11, y: 9))
-    handPath.lineWidth = 1.2
-    handPath.stroke()
+    // Hour hand
+    let hourPath = NSBezierPath()
+    hourPath.move(to: clockCenter)
+    hourPath.line(to: NSPoint(x: 11, y: 8.5))
+    NSColor(white: 0, alpha: 1.0).setStroke()
+    hourPath.lineWidth = 1.2
+    hourPath.stroke()
 
+    // Minute hand
     let minutePath = NSBezierPath()
     minutePath.move(to: clockCenter)
-    minutePath.line(to: NSPoint(x: 12.5, y: 12))
-    minutePath.lineWidth = 1.2
+    minutePath.line(to: NSPoint(x: 13, y: 12))
+    NSColor(white: 0, alpha: 1.0).setStroke()
+    minutePath.lineWidth = 1.0
     minutePath.stroke()
 
-    // Draw clock center dot
+    // Clock center dot
     let dotRect = CGRect(x: 10.5, y: 10.5, width: 1, height: 1)
     let dotPath = NSBezierPath(ovalIn: dotRect)
-    NSColor(red: 0.85, green: 0.47, blue: 0.34, alpha: 1.0).setFill()
+    NSColor(white: 0, alpha: 1.0).setFill()
     dotPath.fill()
 
-    // Draw four dots (messages)
-    let dotPositions: [CGFloat] = [5, 8, 11, 14]
-    for xPos in dotPositions {
-      let msgDotRect = CGRect(x: xPos, y: 12.5, width: 1.2, height: 1.2)
+    // Message dots (three dots below bubble)
+    let dotY: CGFloat = 17
+    let dotSpacing: CGFloat = 3
+    let dotStartX: CGFloat = 7
+    for i in 0..<3 {
+      let dotX = dotStartX + CGFloat(i) * dotSpacing
+      let msgDotRect = CGRect(x: dotX, y: dotY, width: 1.5, height: 1.5)
       let msgDotPath = NSBezierPath(ovalIn: msgDotRect)
-      NSColor(white: 0.1, alpha: 0.6).setFill()
+      NSColor(white: 0, alpha: 1.0).setFill()
       msgDotPath.fill()
     }
 
     image.unlockFocus()
 
-    // Ensure the image is resizable
+    // Ensure the image is resizable with proper scaling
     image.resizingMode = .stretch
     return image
   }()

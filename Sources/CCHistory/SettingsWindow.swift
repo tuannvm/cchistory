@@ -11,13 +11,14 @@ final class SettingsWindow: NSPanel {
   private var resetButton: NSButton!
   private var applyButton: NSButton!
   private var statusLabel: NSTextField!
+  private var descriptionLabel: NSTextField!
 
   var onPathChanged: ((String) -> Void)?
 
   init() {
     super.init(
-      contentRect: NSRect(x: 0, y: 0, width: 500, height: 200),
-      styleMask: [.titled, .closable],
+      contentRect: NSRect(x: 0, y: 0, width: 600, height: 240),
+      styleMask: [.titled, .closable, .fullSizeContentView],
       backing: .buffered,
       defer: false
     )
@@ -25,19 +26,38 @@ final class SettingsWindow: NSPanel {
     self.title = "CCHistory Settings"
     self.isFloatingPanel = false
     self.isMovableByWindowBackground = true
+    self.titlebarAppearsTransparent = true
 
     setupUI()
     loadSavedPath()
   }
 
   private func setupUI() {
+    // Create visual effect view for glass background
+    let visualEffectView = NSVisualEffectView()
+    visualEffectView.translatesAutoresizingMaskIntoConstraints = false
+    visualEffectView.material = .hudWindow
+    visualEffectView.blendingMode = .behindWindow
+    visualEffectView.state = .active
+
+    self.contentViewController = NSViewController()
+    self.contentViewController?.view = visualEffectView
+
+    // Container view for content
     let contentView = NSView()
     contentView.translatesAutoresizingMaskIntoConstraints = false
-    self.contentViewController = NSViewController()
-    self.contentViewController?.view = contentView
+    visualEffectView.addSubview(contentView)
+
+    // Pin content view to visual effect view
+    NSLayoutConstraint.activate([
+      contentView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
+      contentView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
+      contentView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
+      contentView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor),
+    ])
 
     // Title label
-    let titleLabel = NSTextField(labelWithString: "Claude Projects Directory:")
+    let titleLabel = NSTextField(labelWithString: "Claude Projects Directory")
     titleLabel.font = NSFont.boldSystemFont(ofSize: 13)
     titleLabel.translatesAutoresizingMaskIntoConstraints = false
     titleLabel.isEditable = false
@@ -45,10 +65,22 @@ final class SettingsWindow: NSPanel {
     titleLabel.backgroundColor = .clear
     contentView.addSubview(titleLabel)
 
-    // Path text field
+    // Description label
+    descriptionLabel = NSTextField(labelWithString: "Customize where CCHistory looks for your Claude Code conversation history.")
+    descriptionLabel.font = NSFont.systemFont(ofSize: 11)
+    descriptionLabel.textColor = .secondaryLabelColor
+    descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
+    descriptionLabel.isEditable = false
+    descriptionLabel.isBordered = false
+    descriptionLabel.backgroundColor = .clear
+    descriptionLabel.lineBreakMode = .byWordWrapping
+    contentView.addSubview(descriptionLabel)
+
+    // Path text field with larger height
     pathTextField = NSTextField()
     pathTextField.translatesAutoresizingMaskIntoConstraints = false
     pathTextField.placeholderString = defaultPath
+    pathTextField.focusRingType = .none
     contentView.addSubview(pathTextField)
 
     // Browse button
@@ -77,37 +109,45 @@ final class SettingsWindow: NSPanel {
     applyButton.keyEquivalent = "\r"
     contentView.addSubview(applyButton)
 
-    // Layout constraints
+    // Layout constraints with generous spacing
     NSLayoutConstraint.activate([
-      // Title label
-      titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-      titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-      titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+      // Title label - more top padding
+      titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 32),
+      titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
 
-      // Path text field
-      pathTextField.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 10),
-      pathTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-      pathTextField.trailingAnchor.constraint(equalTo: browseButton.leadingAnchor, constant: -10),
+      // Description label - spacious gap below title
+      descriptionLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+      descriptionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      descriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
 
-      // Browse button
+      // Path text field - generous gap below description
+      pathTextField.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 24),
+      pathTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      pathTextField.trailingAnchor.constraint(equalTo: browseButton.leadingAnchor, constant: -16),
+      pathTextField.heightAnchor.constraint(equalToConstant: 28),
+
+      // Browse button - aligned with text field
       browseButton.centerYAnchor.constraint(equalTo: pathTextField.centerYAnchor),
-      browseButton.leadingAnchor.constraint(equalTo: resetButton.leadingAnchor),
-      browseButton.widthAnchor.constraint(equalToConstant: 90),
+      browseButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+      browseButton.widthAnchor.constraint(equalToConstant: 100),
 
-      // Reset button
-      resetButton.topAnchor.constraint(equalTo: pathTextField.bottomAnchor, constant: 10),
-      resetButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-      resetButton.widthAnchor.constraint(equalToConstant: 120),
+      // Reset button - more gap below text field
+      resetButton.topAnchor.constraint(equalTo: pathTextField.bottomAnchor, constant: 16),
+      resetButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+      resetButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 130),
 
-      // Status label
-      statusLabel.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 10),
-      statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-      statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+      // Status label - spacious gap below reset
+      statusLabel.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 16),
+      statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+      statusLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 20),
 
-      // Apply button
-      applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-      applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-      applyButton.widthAnchor.constraint(equalToConstant: 80),
+      // Apply button - generous gap above and below
+      applyButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 24),
+      applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -32),
+      applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+      applyButton.widthAnchor.constraint(equalToConstant: 90),
     ])
   }
 

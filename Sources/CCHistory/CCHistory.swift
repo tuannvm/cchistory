@@ -1,20 +1,28 @@
 import AppKit
 import SwiftUI
-@preconcurrency import UserNotifications
 
 @main
 struct CCHistory: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
   var body: some Scene {
-    Settings {
-      EmptyView()
-    }
+    // Empty - no SwiftUI scenes needed, all UI is in AppDelegate
   }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate {
+  // MARK: - Configuration
+
+  /// Maximum number of sessions to display in the menu at once
+  private static let maxSessionsToDisplay = 10
+  /// Maximum number of search results to show when filtering
+  private static let maxSearchResults = 10
+  /// Number of sessions to load for the search index (should be > maxSessionsToDisplay for good search coverage)
+  private static let sessionsForSearchIndex = 200
+
+  // MARK: - Properties
+
   var statusItem: NSStatusItem?
   var historyParser = HistoryParser()
   var sessions: [Session] = []
@@ -39,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   // Copy feedback state
   private var copiedSessionId: String?
   private var copyFeedbackTimer: Timer?
+
+  // MARK: - NSApplicationDelegate
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     // Initialize HistoryParser with saved custom path
@@ -69,12 +79,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     cacheInvalidated = true
   }
 
+  // MARK: - Private Methods
+
   private func loadSessionsAsync() {
     guard !isLoading else { return }
 
     isLoading = true
 
     let sortOption = currentSortOption
+    let searchIndexLimit = Self.sessionsForSearchIndex
 
     // Get custom path from settings to respect user configuration
     let claudePathKey = "claudeProjectsPath"
@@ -82,10 +95,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     Task(priority: .userInitiated) {
       // Run parsing off the main actor
-      // Note: We fetch more sessions for search index (200) but display fewer
+      // Note: We fetch more sessions for search index (sessionsForSearchIndex) but display fewer (maxSessionsToDisplay)
       let parseResult = await Task.detached {
         let parser = HistoryParser(claudePath: customPath)
-        return parser.getSessionsWithIndex(sortOption: sortOption, limit: 200)
+        return parser.getSessionsWithIndex(sortOption: sortOption, limit: searchIndexLimit)
       }.value
 
       // Update UI on main actor
@@ -108,25 +121,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     // Add search field at the top
     let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 250, height: 24))
-    searchField.placeholderString = "Search sessions..."
+    searchField.placeholderString = "Search..."
     searchField.stringValue = currentSearchQuery
     searchField.delegate = self
     searchField.target = self
+    searchField.action = #selector(searchFieldAction(_:))
 
     let searchViewItem = NSMenuItem()
     searchViewItem.view = searchField
     menu.addItem(searchViewItem)
 
-    menu.addItem(NSMenuItem.separator())
-
-    // Header with current sort option
-    let headerTitle = "Claude Code History [\(currentSortOption.rawValue)]"
-    let headerItem = NSMenuItem(title: headerTitle, action: nil, keyEquivalent: "")
-    headerItem.attributedTitle = NSAttributedString(
-      string: headerTitle,
-      attributes: [.font: NSFont.boldSystemFont(ofSize: 13)]
-    )
-    menu.addItem(headerItem)
     menu.addItem(NSMenuItem.separator())
 
     // Sort options submenu
@@ -154,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     menu.addItem(sortMenuItem)
     menu.addItem(NSMenuItem.separator())
 
-    // Filter sessions based on search query
+    // Filter sessions based on search query - max 10 results
     let sessionsToDisplay: [Session]
     if isLoading && cachedSessions.isEmpty {
       // Show loading indicator
@@ -164,15 +168,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
       sessionsToDisplay = []
     } else if cacheInvalidated && !isLoading {
       // Cache invalidated but not loading, trigger load and use stale cache
-      sessionsToDisplay = cachedSessions.isEmpty ? [] : cachedSessions
+      sessionsToDisplay = Array(cachedSessions.prefix(Self.maxSessionsToDisplay))
       loadSessionsAsync()
     } else {
-      // Apply search filter
+      // Apply search filter with configurable limits
       if currentSearchQuery.isEmpty {
-        sessionsToDisplay = cachedSessions
+        sessionsToDisplay = Array(cachedSessions.prefix(Self.maxSessionsToDisplay))
       } else if let searchIndex = cachedSearchIndex {
         let matchingIds = searchIndex.search(currentSearchQuery)
-        sessionsToDisplay = cachedSessions.filter { matchingIds.contains($0.id) }
+        sessionsToDisplay = cachedSessions.filter { matchingIds.contains($0.id) }.prefix(Self.maxSearchResults).map { $0 }
       } else {
         sessionsToDisplay = []
       }
@@ -223,17 +227,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     menu.addItem(NSMenuItem.separator())
 
-    // LLM Naming info item
-    let llmInfoItem = NSMenuItem(
-      title: "💡 Tip: Rename unnamed sessions via LLM",
-      action: #selector(showLLMNamingHelp),
-      keyEquivalent: "?"
-    )
-    llmInfoItem.target = self
-    menu.addItem(llmInfoItem)
-
-    menu.addItem(NSMenuItem.separator())
-
     // Refresh button
     let refreshItem = NSMenuItem(
       title: "Refresh", action: #selector(refreshMenu), keyEquivalent: "r")
@@ -248,6 +241,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     statusItem.menu = menu
   }
 
+  // MARK: - Actions
+
   @objc func changeSortOption(_ sender: NSMenuItem) {
     if let index = SessionSortOption.allCases.firstIndex(where: { $0.rawValue == sender.title }),
       let newOption = SessionSortOption.allCases.element(at: index)
@@ -260,53 +255,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     }
   }
 
-  @objc func showLLMNamingHelp() {
-    let alert = NSAlert()
-    alert.messageText = "About Session Naming"
-    alert.informativeText = """
-      Sessions are named automatically from your Claude Code history.
-
-      • If a session has a clear name from your prompts, it will be displayed
-      • Command-like entries (/model, /help, etc.) show as "Unnamed Session"
-      • Very long names are truncated to 50 characters
-
-      Future Enhancement:
-      We plan to add optional LLM-based naming (using local Ollama) to generate
-      descriptive names for unnamed sessions based on their conversation content.
-
-      For now, you can identify sessions by their project, branch, and timestamp.
-      """
-    alert.alertStyle = .informational
-    alert.addButton(withTitle: "Got it")
-    alert.runModal()
-  }
-
   @objc func showAboutDialog() {
-    let alert = NSAlert()
-    alert.messageText = "CCHistory"
-    alert.informativeText = """
-      Claude Code Conversation History Menu Bar App
-
-      Version: 1.0.0
-      Website: github.com/tuannvm/cchistory
-
-      CCHistory provides quick access to your Claude Code conversation
-      history directly from the menu bar. Click any session to copy its
-      resume command to the clipboard.
-
-      Features:
-      • Search across session names and message content
-      • Sort by activity, recency, or time period
-      • Copy resume commands with one click
-      • Async loading for optimal performance
-      • Custom Claude projects directory support
-
-      © 2024
-      """
-    alert.alertStyle = .informational
-    alert.addButton(withTitle: "OK")
-
-    alert.runModal()
+    if let url = URL(string: "https://github.com/tuannvm/cchistory") {
+      NSWorkspace.shared.open(url)
+    }
   }
 
   @objc func openSettings() {
@@ -356,11 +308,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     copyResumeCommand(for: sessionToCopy)
 
-    // Show improved copy feedback
+    // Show copy feedback
     showCopyFeedback(for: sessionToCopy)
-
-    // Still show notification as fallback (less intrusive)
-    // showNotification(for: sessionToCopy)
   }
 
   private func showCopyFeedback(for session: Session) {
@@ -391,25 +340,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     pasteboard.setString(session.resumeCommand, forType: .string)
   }
 
-  private func showNotification(for session: Session) {
-    let center = UNUserNotificationCenter.current()
-    center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-      if granted {
-        let content = UNMutableNotificationContent()
-        content.title = "Resume Command Copied"
-        content.body = "Paste in terminal to resume: \(session.cleanedDisplayName)"
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-          identifier: UUID().uuidString,
-          content: content,
-          trigger: nil
-        )
-        center.add(request)
-      }
-    }
-  }
-
   @objc func quit() {
     NSApplication.shared.terminate(nil)
   }
@@ -420,7 +350,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     guard let searchField = obj.object as? NSSearchField else { return }
     currentSearchQuery = searchField.stringValue
   }
+
+  @objc func searchFieldAction(_ sender: NSSearchField) {
+    // Handle cancel button click in search field
+    if sender.stringValue.isEmpty {
+      currentSearchQuery = ""
+    }
+  }
 }
+
+// MARK: - Supporting Types
 
 /// Custom NSMenuItem that stores session data
 final class SessionMenuItem: NSMenuItem {
@@ -429,39 +368,35 @@ final class SessionMenuItem: NSMenuItem {
   init(session: Session, isCopied: Bool = false) {
     self.session = session
 
-    let repoName = session.repoName
-    let branch = session.gitBranch.map { " [\($0)]" } ?? ""
-    let count = session.messageCount
-    let timeAgo = session.formattedRelativeDate
     let displayName = session.cleanedDisplayName
+    let repoName = session.repoName
 
     let title: String
     if isCopied {
-      title = "✓ Copied: \(repoName): \(displayName)"
+      title = "Copied — \(displayName)"
     } else {
-      title = "\(repoName): \(displayName)\(branch) • \(timeAgo) (\(count) msgs)"
+      title = "\(displayName) — \(repoName)"
     }
 
     super.init(title: title, action: nil, keyEquivalent: "")
 
     let tooltip = """
-      Project: \(session.projectPath.isEmpty ? "None" : session.projectPath)
       Session: \(displayName)
-      Time: \(session.formattedDate)
-      Messages: \(count)
+      Repository: \(repoName)
       Branch: \(session.gitBranch ?? "N/A")
+      Time: \(session.formattedRelativeDate) (\(session.messageCount) messages)
 
       Click to copy resume command
       """
     self.toolTip = tooltip
 
-    // Add visual feedback for copied state
+    // Add visual feedback for copied state using system accent color
     if isCopied {
       self.attributedTitle = NSAttributedString(
         string: title,
         attributes: [
-          .foregroundColor: NSColor.systemGreen,
-          .font: NSFont.boldSystemFont(ofSize: 13),
+          .foregroundColor: NSColor.controlAccentColor,
+          .font: NSFont.systemFont(ofSize: 13),
         ]
       )
     }
