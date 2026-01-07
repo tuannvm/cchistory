@@ -9,8 +9,7 @@ let package = Package(
             name: "CCHistory",
             resources: [.process("Assets.xcassets")],
             linkerSettings: [
-                .linkedFramework("Cocoa"),
-                .linkedFramework("UserNotifications")
+                .linkedFramework("Cocoa")
             ]
         ),
         .testTarget(

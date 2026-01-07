@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-@preconcurrency import UserNotifications
 
 @main
 struct CCHistory: App {
@@ -14,12 +13,15 @@ struct CCHistory: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate {
   // MARK: - Configuration
+
   /// Maximum number of sessions to display in the menu at once
   private static let maxSessionsToDisplay = 10
   /// Maximum number of search results to show when filtering
   private static let maxSearchResults = 10
   /// Number of sessions to load for the search index (should be > maxSessionsToDisplay for good search coverage)
   private static let sessionsForSearchIndex = 200
+
+  // MARK: - Properties
 
   var statusItem: NSStatusItem?
   var historyParser = HistoryParser()
@@ -46,6 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   // Copy feedback state
   private var copiedSessionId: String?
   private var copyFeedbackTimer: Timer?
+
+  // MARK: - NSApplicationDelegate
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     // Initialize HistoryParser with saved custom path
@@ -75,6 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     // Invalidate cache when app becomes active (user may have new sessions)
     cacheInvalidated = true
   }
+
+  // MARK: - Private Methods
 
   private func loadSessionsAsync() {
     guard !isLoading else { return }
@@ -236,6 +242,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     statusItem.menu = menu
   }
 
+  // MARK: - Actions
+
   @objc func changeSortOption(_ sender: NSMenuItem) {
     if let index = SessionSortOption.allCases.firstIndex(where: { $0.rawValue == sender.title }),
       let newOption = SessionSortOption.allCases.element(at: index)
@@ -280,10 +288,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     loadSessionsAsync()
   }
 
-  @objc func clearSearch() {
-    currentSearchQuery = ""
-  }
-
   @objc func refreshMenu() {
     // Invalidate cache and reload
     cacheInvalidated = true
@@ -308,11 +312,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
 
     copyResumeCommand(for: sessionToCopy)
 
-    // Show improved copy feedback
+    // Show copy feedback
     showCopyFeedback(for: sessionToCopy)
-
-    // Still show notification as fallback (less intrusive)
-    // showNotification(for: sessionToCopy)
   }
 
   private func showCopyFeedback(for session: Session) {
@@ -343,25 +344,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     pasteboard.setString(session.resumeCommand, forType: .string)
   }
 
-  private func showNotification(for session: Session) {
-    let center = UNUserNotificationCenter.current()
-    center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-      if granted {
-        let content = UNMutableNotificationContent()
-        content.title = "Resume Command Copied"
-        content.body = "Paste in terminal to resume: \(session.cleanedDisplayName)"
-        content.sound = .default
-
-        let request = UNNotificationRequest(
-          identifier: UUID().uuidString,
-          content: content,
-          trigger: nil
-        )
-        center.add(request)
-      }
-    }
-  }
-
   @objc func quit() {
     NSApplication.shared.terminate(nil)
   }
@@ -380,6 +362,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     }
   }
 }
+
+// MARK: - Supporting Types
 
 /// Custom NSMenuItem that stores session data
 final class SessionMenuItem: NSMenuItem {
