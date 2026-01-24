@@ -264,10 +264,115 @@ final class WebServer: @unchecked Sendable {
       )
     }
 
-    // Serve static files - index.html at root
-    router.get("/") { _, _ in
-      return htmlResponse(indexHtml)
+    // MARK: - Apple Intelligence API
+
+    // API: Get available models
+    router.get("/api/v1/models") { _, _ in
+      return ModelsResponse(data: [
+        Model(id: "base"),
+        Model(id: "permissive"),
+      ])
     }
+
+    // API: Chat completions endpoint
+    router.post("/api/v1/chat/completions") { request, _ async throws -> Response in
+      // Read request body
+      let buffer = try await request.body.collect(upTo: .max)
+      guard let data = buffer.getData(at: 0, length: buffer.readableBytes) else {
+        throw HTTPError(.badRequest, message: "Missing request body")
+      }
+
+      let decoder = JSONDecoder()
+      let completionRequest = try decoder.decode(ChatCompletionRequest.self, from: data)
+
+      // Check if Apple Intelligence is available
+      guard isAppleIntelligenceAvailable else {
+        var headers = HTTPFields()
+        headers[.contentType] = "application/json"
+        let errorResponse = [
+          "error": [
+            "message": appleIntelligenceAvailabilityDescription,
+            "type": "service_unavailable"
+          ]
+        ]
+        let jsonData = try JSONEncoder().encode(errorResponse)
+        return Response(status: .serviceUnavailable, headers: headers, body: .init { writer in
+          let buffer = ByteBuffer(data: jsonData)
+          try await writer.write(buffer)
+          try await writer.finish(nil)
+        })
+      }
+
+      // Create session
+      guard let session = try? AppleIntelligenceSession(from: completionRequest) else {
+        var headers = HTTPFields()
+        headers[.contentType] = "application/json"
+        let errorResponse = [
+          "error": [
+            "message": "Failed to create Apple Intelligence session",
+            "type": "internal_error"
+          ]
+        ]
+        let jsonData = try JSONEncoder().encode(errorResponse)
+        return Response(status: .internalServerError, headers: headers, body: .init { writer in
+          let buffer = ByteBuffer(data: jsonData)
+          try await writer.write(buffer)
+          try await writer.finish(nil)
+        })
+      }
+
+      // Handle streaming vs non-streaming
+      let modelName = completionRequest.model ?? "base"
+
+      if completionRequest.stream == true {
+        // Streaming response
+        var headers = HTTPFields()
+        headers[.contentType] = "text/event-stream"
+        headers[.cacheControl] = "no-store"
+        headers[.connection] = "keep-alive"
+
+        let stream = session.streamResponses()
+        let asyncStream = AsyncStream<ByteBuffer> { continuation in
+          Task {
+            do {
+              for await response in stream {
+                let chunk = AppleIntelligenceResponseBuilder.buildChunk(from: response, model: modelName)
+                let sseData = try AppleIntelligenceResponseBuilder.buildSSEData(from: chunk)
+                continuation.yield(ByteBuffer(string: sseData))
+              }
+              // Send termination
+              continuation.yield(ByteBuffer(string: AppleIntelligenceResponseBuilder.sseTermination))
+              continuation.finish()
+            } catch {
+              continuation.finish()
+            }
+          }
+        }
+
+        let responseBody = ResponseBody(asyncSequence: asyncStream)
+        return Response(status: .ok, headers: headers, body: responseBody)
+      } else {
+        // Non-streaming response
+        let sessionResponse = try await session.getResponse()
+        let chatResponse = AppleIntelligenceResponseBuilder.buildResponse(from: sessionResponse, model: modelName)
+
+        var headers = HTTPFields()
+        headers[.contentType] = "application/json; charset=utf-8"
+
+        let encoder = JSONEncoder()
+        let responseData = try encoder.encode(chatResponse)
+        return Response(status: .ok, headers: headers, body: .init { writer in
+          let buffer = ByteBuffer(data: responseData)
+          try await writer.write(buffer)
+          try await writer.finish(nil)
+        })
+      }
+    }
+
+  // Serve static files - index.html at root
+  router.get("/") { _, _ in
+    return htmlResponse(indexHtml)
+  }
 
     // Serve CSS files
     router.get("/css/styles.css") { _, _ in
