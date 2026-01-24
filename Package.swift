@@ -18,7 +18,8 @@ let package = Package(
                 .process("webui")
             ],
             linkerSettings: [
-                .linkedFramework("Cocoa")
+                .linkedFramework("Cocoa"),
+                .linkedFramework("FoundationModels"),
             ]
         ),
         .testTarget(
