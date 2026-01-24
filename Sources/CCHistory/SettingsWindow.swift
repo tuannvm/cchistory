@@ -1,7 +1,6 @@
 import AppKit
 
 /// Settings window for configuring CCHistory preferences
-@MainActor
 final class SettingsWindow: NSPanel {
   private let claudePathKey = "claudeProjectsPath"
   private let defaultPath = "\(NSHomeDirectory())/.claude"
@@ -12,12 +11,19 @@ final class SettingsWindow: NSPanel {
   private var applyButton: NSButton!
   private var statusLabel: NSTextField!
   private var descriptionLabel: NSTextField!
+  private var webServerToggle: NSButton!
+  private var webServerPortField: NSTextField!
+  private var webServerUrlLabel: NSTextField!
+  private var webServerStatusLabel: NSTextField!
 
   var onPathChanged: ((String) -> Void)?
+  var onWebServerToggled: ((Bool, UInt16) -> Void)?
+  var onRequestWebServerURL: (() -> String?)?
+  var onRequestWebServerStatus: (() -> String?)?
 
   init() {
     super.init(
-      contentRect: NSRect(x: 0, y: 0, width: 600, height: 240),
+      contentRect: NSRect(x: 0, y: 0, width: 600, height: 360),
       styleMask: [.titled, .closable, .fullSizeContentView],
       backing: .buffered,
       defer: false
@@ -103,6 +109,59 @@ final class SettingsWindow: NSPanel {
     statusLabel.font = NSFont.systemFont(ofSize: 11)
     contentView.addSubview(statusLabel)
 
+    // Web server section title
+    let webServerTitle = NSTextField(labelWithString: "Web Server")
+    webServerTitle.font = NSFont.boldSystemFont(ofSize: 13)
+    webServerTitle.translatesAutoresizingMaskIntoConstraints = false
+    webServerTitle.isEditable = false
+    webServerTitle.isBordered = false
+    webServerTitle.backgroundColor = .clear
+    contentView.addSubview(webServerTitle)
+
+    // Web server toggle
+    webServerToggle = NSButton(checkboxWithTitle: "Enable local web access", target: self, action: #selector(webServerToggleChanged))
+    webServerToggle.translatesAutoresizingMaskIntoConstraints = false
+    contentView.addSubview(webServerToggle)
+
+    // Web server port
+    let portLabel = NSTextField(labelWithString: "Port")
+    portLabel.font = NSFont.systemFont(ofSize: 11)
+    portLabel.textColor = .secondaryLabelColor
+    portLabel.translatesAutoresizingMaskIntoConstraints = false
+    portLabel.isEditable = false
+    portLabel.isBordered = false
+    portLabel.backgroundColor = .clear
+    contentView.addSubview(portLabel)
+
+    webServerPortField = NSTextField()
+    webServerPortField.translatesAutoresizingMaskIntoConstraints = false
+    webServerPortField.placeholderString = "8000"
+    webServerPortField.focusRingType = .none
+    webServerPortField.alignment = .left
+    contentView.addSubview(webServerPortField)
+
+    // Web server URL label
+    webServerUrlLabel = NSTextField(labelWithString: "")
+    webServerUrlLabel.font = NSFont.systemFont(ofSize: 11)
+    webServerUrlLabel.textColor = .secondaryLabelColor
+    webServerUrlLabel.translatesAutoresizingMaskIntoConstraints = false
+    webServerUrlLabel.isEditable = false
+    webServerUrlLabel.isBordered = false
+    webServerUrlLabel.backgroundColor = .clear
+    webServerUrlLabel.lineBreakMode = .byTruncatingMiddle
+    contentView.addSubview(webServerUrlLabel)
+
+    // Web server status label
+    webServerStatusLabel = NSTextField(labelWithString: "")
+    webServerStatusLabel.font = NSFont.systemFont(ofSize: 11)
+    webServerStatusLabel.textColor = .secondaryLabelColor
+    webServerStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+    webServerStatusLabel.isEditable = false
+    webServerStatusLabel.isBordered = false
+    webServerStatusLabel.backgroundColor = .clear
+    webServerStatusLabel.lineBreakMode = .byTruncatingMiddle
+    contentView.addSubview(webServerStatusLabel)
+
     // Apply button
     applyButton = NSButton(title: "Apply", target: self, action: #selector(applyClicked))
     applyButton.translatesAutoresizingMaskIntoConstraints = false
@@ -137,26 +196,59 @@ final class SettingsWindow: NSPanel {
       resetButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
       resetButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 130),
 
-      // Status label - spacious gap below reset
-      statusLabel.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 16),
+      // Web server section
+      webServerTitle.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 24),
+      webServerTitle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      webServerTitle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+
+      webServerToggle.topAnchor.constraint(equalTo: webServerTitle.bottomAnchor, constant: 8),
+      webServerToggle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+
+      portLabel.centerYAnchor.constraint(equalTo: webServerPortField.centerYAnchor),
+      portLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+
+      webServerPortField.topAnchor.constraint(equalTo: webServerToggle.bottomAnchor, constant: 12),
+      webServerPortField.leadingAnchor.constraint(equalTo: portLabel.trailingAnchor, constant: 12),
+      webServerPortField.widthAnchor.constraint(equalToConstant: 80),
+      webServerPortField.heightAnchor.constraint(equalToConstant: 24),
+
+      webServerUrlLabel.topAnchor.constraint(equalTo: webServerPortField.bottomAnchor, constant: 8),
+      webServerUrlLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      webServerUrlLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+
+      webServerStatusLabel.topAnchor.constraint(equalTo: webServerUrlLabel.bottomAnchor, constant: 6),
+      webServerStatusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+      webServerStatusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+
+      // Status label - spacious gap below URL label
+      statusLabel.topAnchor.constraint(equalTo: webServerStatusLabel.bottomAnchor, constant: 16),
       statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
       statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
       statusLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 20),
 
       // Apply button - generous gap above and below
       applyButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 24),
-      applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -32),
       applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
       applyButton.widthAnchor.constraint(equalToConstant: 90),
+      applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -32),
     ])
   }
 
-  private func loadSavedPath() {
+  // MARK: - Actions
+
+  func loadSavedPath() {
     if let savedPath = UserDefaults.standard.string(forKey: claudePathKey) {
       pathTextField.stringValue = savedPath
     } else {
       pathTextField.stringValue = defaultPath
     }
+
+    let isEnabled = UserDefaults.standard.bool(forKey: "webServerEnabled")
+    let port = UserDefaults.standard.integer(forKey: "webServerPort")
+    webServerToggle.state = isEnabled ? .on : .off
+    webServerPortField.stringValue = port > 0 ? "\(port)" : "8000"
+    updateWebServerUrlLabel(isEnabled: isEnabled)
+    updateWebServerStatusLabel(isEnabled: isEnabled)
   }
 
   @objc private func browseClicked() {
@@ -185,16 +277,65 @@ final class SettingsWindow: NSPanel {
   @objc private func applyClicked() {
     let newPath = pathTextField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    if validatePath() {
-      UserDefaults.standard.set(newPath, forKey: claudePathKey)
-      onPathChanged?(newPath)
-      statusLabel.stringValue = "Settings saved. Relaunch the app to apply changes."
-      statusLabel.textColor = .systemGreen
+    guard validatePath() else { return }
 
-      DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-        self?.close()
-      }
+    let portValue = webServerPortField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let port = UInt16(portValue), port > 0 else {
+      statusLabel.stringValue = "Port must be a number between 1 and 65535."
+      statusLabel.textColor = .systemRed
+      return
     }
+
+    UserDefaults.standard.set(newPath, forKey: claudePathKey)
+    UserDefaults.standard.set(Int(port), forKey: "webServerPort")
+
+    let isEnabled = (webServerToggle.state == .on)
+    UserDefaults.standard.set(isEnabled, forKey: "webServerEnabled")
+
+    onPathChanged?(newPath)
+    onWebServerToggled?(isEnabled, port)
+
+    statusLabel.stringValue = "Settings saved."
+    statusLabel.textColor = .systemGreen
+    updateWebServerUrlLabel(isEnabled: isEnabled)
+    updateWebServerStatusLabel(isEnabled: isEnabled)
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+      self?.close()
+    }
+  }
+
+  @objc private func webServerToggleChanged() {
+    updateWebServerUrlLabel(isEnabled: webServerToggle.state == .on)
+    updateWebServerStatusLabel(isEnabled: webServerToggle.state == .on)
+  }
+
+  private func updateWebServerUrlLabel(isEnabled: Bool) {
+    guard isEnabled else {
+      webServerUrlLabel.stringValue = "Web access disabled."
+      return
+    }
+
+    if let url = onRequestWebServerURL?() {
+      webServerUrlLabel.stringValue = "Open from iPhone: \(url)"
+    } else {
+      webServerUrlLabel.stringValue = "Server not running."
+    }
+  }
+
+  private func updateWebServerStatusLabel(isEnabled: Bool) {
+    guard isEnabled else {
+      webServerStatusLabel.stringValue = "Server stopped."
+      webServerStatusLabel.textColor = .secondaryLabelColor
+      return
+    }
+
+    if let status = onRequestWebServerStatus?() {
+      webServerStatusLabel.stringValue = status
+    } else {
+      webServerStatusLabel.stringValue = "Starting web server..."
+    }
+    webServerStatusLabel.textColor = .secondaryLabelColor
   }
 
   private func validatePath() -> Bool {

@@ -114,3 +114,10 @@ struct Session: Identifiable, Codable, Sendable, Equatable {
     return timestamp >= cutoff
   }
 }
+
+/// Represents a single message in a session for the web UI.
+struct SessionMessage: Codable, Sendable, Equatable {
+  let role: String
+  let content: String
+  let timestamp: Date?
+}

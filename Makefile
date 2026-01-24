@@ -25,6 +25,18 @@ build:
 	@if [ -f "$(BINARY_NAME).icns" ]; then \
 		cp $(BINARY_NAME).icns $(APP_NAME)/Contents/Resources/; \
 	fi
+	@echo "Copying webui resources..."
+	@if [ -d "$(BUILD_DIR)/release/$(BINARY_NAME)_$(BINARY_NAME).bundle" ]; then \
+		cp $(BUILD_DIR)/release/$(BINARY_NAME)_$(BINARY_NAME).bundle/*.html $(APP_NAME)/Contents/Resources/ 2>/dev/null || true; \
+		cp $(BUILD_DIR)/release/$(BINARY_NAME)_$(BINARY_NAME).bundle/*.css $(APP_NAME)/Contents/Resources/ 2>/dev/null || true; \
+		cp $(BUILD_DIR)/release/$(BINARY_NAME)_$(BINARY_NAME).bundle/*.js $(APP_NAME)/Contents/Resources/ 2>/dev/null || true; \
+	fi
+	@if [ ! -f "$(APP_NAME)/Contents/Resources/index.html" ]; then \
+		echo "Copying from source directory..."; \
+		cp Sources/CCHistory/webui/index.html $(APP_NAME)/Contents/Resources/; \
+		cp Sources/CCHistory/webui/css/styles.css $(APP_NAME)/Contents/Resources/; \
+		cp Sources/CCHistory/webui/js/app.js $(APP_NAME)/Contents/Resources/; \
+	fi
 	@sed -e 's/EXECUTABLE_NAME/$(BINARY_NAME)/g' \
 	     -e 's/BUNDLE_NAME/$(BINARY_NAME)/g' \
 	     -e 's/VERSION/$(VERSION)/g' \

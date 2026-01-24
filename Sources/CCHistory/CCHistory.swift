@@ -26,8 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
   var statusItem: NSStatusItem?
   var historyParser = HistoryParser()
   var sessions: [Session] = []
-  var currentSortOption: SessionSortOption = .mostActive
+  var currentSortOption: SessionSortOption = .mostRecent
   private var settingsWindow: SettingsWindow?
+
+  // Web server and file monitoring
+  private var webServer: WebServer?
+  private var fileMonitor: FileMonitor?
 
   // Async loading state
   private var cachedSessions: [Session] = []
@@ -63,6 +67,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
       button.image = NSImage.cchistoryLogo
     }
 
+    // Register web server defaults
+    UserDefaults.standard.register(defaults: [
+      "webServerPort": 8000,
+      "webServerEnabled": false,
+    ])
+
+    // Initialize web server
+    webServer = WebServer()
+
+    // Start server only if enabled in settings
+    if UserDefaults.standard.bool(forKey: "webServerEnabled") {
+      Task {
+        await self.startWebServer()
+      }
+    }
+
+    // Setup file monitoring for session changes
+    setupFileMonitoring()
+
     // Trigger initial async load
     loadSessionsAsync()
     // Build menu immediately to show loading indicator
@@ -74,6 +97,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
         self?.refreshMenu()
       }
     }
+  }
+
+  // MARK: - File Monitoring
+
+  private func setupFileMonitoring() {
+    let projectsPath = "\(historyParser.path)/projects"
+    fileMonitor = FileMonitor(path: projectsPath) { [weak self] in
+      guard let self = self else { return }
+
+      // Invalidate cache and reload
+      self.cacheInvalidated = true
+      self.loadSessionsAsync()
+
+      // Broadcast to web clients if server is running
+      if self.webServer?.isRunning == true {
+        self.webServer?.broadcastSessionChange()
+      }
+    }
+  }
+
+  private func refreshFileMonitoring() {
+    fileMonitor?.stopMonitoring()
+    fileMonitor = nil
+    setupFileMonitoring()
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {
@@ -111,6 +158,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
         self.sessions = parseResult.sessions
         self.isLoading = false
         self.cacheInvalidated = false
+
+        // Update shared cache for web server
+        SessionCache.shared.update(parseResult.sessions, searchIndex: parseResult.searchIndex)
+
+        var messageDetailsBySessionId: [String: [SessionMessage]] = [:]
+        for parsedSession in parseResult.parsedSessions {
+          messageDetailsBySessionId[parsedSession.session.id] = parsedSession.messageDetails
+        }
+        SessionCache.shared.updateMessageDetails(messageDetailsBySessionId)
+
         self.buildMenu()
       }
     }
@@ -269,6 +326,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
       settingsWindow?.onPathChanged = { [weak self] newPath in
         self?.handlePathChanged(newPath)
       }
+      settingsWindow?.onWebServerToggled = { [weak self] isEnabled, port in
+        self?.handleWebServerSettingsChanged(isEnabled: isEnabled, port: port)
+      }
+      settingsWindow?.onRequestWebServerURL = { [weak self] in
+        self?.webServerURL?.absoluteString
+      }
+      settingsWindow?.onRequestWebServerStatus = { [weak self] in
+        self?.webServer?.statusDescription
+      }
     }
 
     settingsWindow?.makeKeyAndOrderFront(nil)
@@ -281,9 +347,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSSearchFieldDelegate 
     let pathToUse = newPath.isEmpty ? defaultPath : newPath
     historyParser = HistoryParser(claudePath: pathToUse)
 
+    // Restart file monitoring with new path
+    refreshFileMonitoring()
+
     // Invalidate cache and reload
     cacheInvalidated = true
     loadSessionsAsync()
+  }
+
+  private func handleWebServerSettingsChanged(isEnabled: Bool, port: UInt16) {
+    Task { @MainActor in
+      if isWebServerRunning {
+        await stopWebServer()
+      }
+
+      if isEnabled {
+        await startWebServer()
+      }
+
+      settingsWindow?.loadSavedPath()
+    }
   }
 
   @objc func refreshMenu() {
@@ -430,5 +513,50 @@ extension Session {
 extension Array {
   func element(at index: Int) -> Element? {
     return indices.contains(index) ? self[index] : nil
+  }
+}
+
+// MARK: - Web Server Control
+
+@MainActor
+extension AppDelegate {
+  /// Whether the web server is currently running
+  var isWebServerRunning: Bool {
+    webServer?.isRunning ?? false
+  }
+
+  /// The URL of the web server (if running)
+  var webServerURL: URL? {
+    guard isWebServerRunning else { return nil }
+    return webServer?.serverURL
+  }
+
+  /// Start the web server
+  func startWebServer() async {
+    print("[AppDelegate] startWebServer called, webServer is nil: \(webServer == nil)")
+    do {
+      try await webServer?.start()
+      print("[AppDelegate] Web server started, isRunning: \(webServer?.isRunning ?? false)")
+      settingsWindow?.loadSavedPath()
+    } catch {
+      print("[AppDelegate] Failed to start web server: \(error)")
+      webServer?.recordStartError(error)
+
+      // Show error alert
+      let alert = NSAlert()
+      alert.messageText = "Failed to Start Web Server"
+      alert.informativeText = "Error: \(error.localizedDescription)\n\nPlease check if port \(webServer?.port ?? 8000) is already in use."
+      alert.alertStyle = .critical
+      alert.addButton(withTitle: "OK")
+      alert.runModal()
+
+      settingsWindow?.loadSavedPath()
+    }
+  }
+
+  /// Stop the web server
+  func stopWebServer() async {
+    await webServer?.stop()
+    print("[AppDelegate] Web server stopped")
   }
 }

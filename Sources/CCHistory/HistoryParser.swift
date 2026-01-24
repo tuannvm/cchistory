@@ -1,10 +1,14 @@
 import Foundation
+import CryptoKit
 
 /// Parses Claude Code sessions from ~/.claude/projects/
 final class HistoryParser {
 
   private let claudePath: String
   private let fileManager = FileManager.default
+
+  /// The Claude base path (read-only accessor)
+  var path: String { claudePath }
 
   init(claudePath: String? = nil) {
     // Use provided path or default to ~/.claude
@@ -28,6 +32,7 @@ final class HistoryParser {
   struct ParseResult: Sendable {
     var sessions: [Session]
     var searchIndex: SearchIndex
+    var parsedSessions: [ParsedSession]
   }
 
   /// Parse sessions from project directories
@@ -40,7 +45,7 @@ final class HistoryParser {
     let projectsPath = "\(claudePath)/projects"
     guard let projectDirs = try? fileManager.contentsOfDirectory(atPath: projectsPath) else {
       print("Failed to list projects directory")
-      return ParseResult(sessions: [], searchIndex: SearchIndex())
+      return ParseResult(sessions: [], searchIndex: SearchIndex(), parsedSessions: [])
     }
 
     var parsedSessions: [ParsedSession] = []
@@ -86,13 +91,14 @@ final class HistoryParser {
       searchIndex.indexSession(parsedSession.session, messages: parsedSession.messages)
     }
 
-    return ParseResult(sessions: sessions, searchIndex: searchIndex)
+    return ParseResult(sessions: sessions, searchIndex: searchIndex, parsedSessions: parsedSessions)
   }
 
   /// Parse result containing session and searchable messages
   struct ParsedSession: Sendable {
     let session: Session
     let messages: [String]
+    let messageDetails: [SessionMessage]
   }
 
   /// Parse a single session file to extract summary and metadata
@@ -107,6 +113,7 @@ final class HistoryParser {
     var latestTimestamp: TimeInterval = 0
     var messageCount = 0
     var messages: [String] = []
+    var messageDetails: [SessionMessage] = []
     var hasCapturedSummary = false
     var actualProjectPath: String?
 
@@ -141,15 +148,21 @@ final class HistoryParser {
       // Extract message content for search index
       if let type = json["type"] as? String {
         var messageContent: String?
+        var messageTimestamp: Date?
 
         switch type {
         case "user":
+          // Handle both old format (content directly) and new format (nested in message object)
           if let content = json["content"] as? String {
+            messageContent = content
+          } else if let message = json["message"] as? [String: Any],
+                    let content = message["content"] as? String {
             messageContent = content
           }
           // Also check for timestamp from user messages
           if let timestampStr = json["timestamp"] as? String {
             if let date = formatter.date(from: timestampStr) {
+              messageTimestamp = date
               let timestamp = date.timeIntervalSince1970
               if timestamp > latestTimestamp {
                 latestTimestamp = timestamp
@@ -158,16 +171,37 @@ final class HistoryParser {
             messageCount += 1
           }
         case "assistant":
-
+          // Handle both old format (content with text) and new format (nested in message object)
           if let content = json["content"] as? [String: Any],
-            let text = content["text"] as? String
-          {
+             let text = content["text"] as? String {
             messageContent = text
+          } else if let message = json["message"] as? [String: Any],
+                    let content = message["content"] {
+            // New format: content is an array of content blocks
+            if let contentArray = content as? [[String: Any]] {
+              // Extract text from content blocks
+              var texts: [String] = []
+              for block in contentArray {
+                if let text = block["text"] as? String {
+                  texts.append(text)
+                } else if let type = block["type"] as? String, type == "thinking",
+                          let thinking = block["thinking"] as? String {
+                  texts.append("[Thinking: \(thinking)]")
+                }
+              }
+              if !texts.isEmpty {
+                messageContent = texts.joined(separator: "\n")
+              }
+            } else if let text = content as? String {
+              // Fallback for string content
+              messageContent = text
+            }
           }
 
           // Check timestamp from assistant messages
           if let timestampStr = json["timestamp"] as? String {
             if let date = formatter.date(from: timestampStr) {
+              messageTimestamp = date
               let timestamp = date.timeIntervalSince1970
               if timestamp > latestTimestamp {
                 latestTimestamp = timestamp
@@ -181,6 +215,13 @@ final class HistoryParser {
         // Store message content for search indexing
         if let msg = messageContent {
           messages.append(msg)
+          messageDetails.append(
+            SessionMessage(
+              role: type,
+              content: msg,
+              timestamp: messageTimestamp
+            )
+          )
         }
       }
     }
@@ -193,8 +234,18 @@ final class HistoryParser {
     // Use actual path from session file if available, otherwise fall back to decoded path
     let finalProjectPath = actualProjectPath ?? projectPath
 
+    // Create a stable ID from the session file path so it remains consistent across parses
+    // This ensures the SessionCache can reliably look up messages by session ID
+    let stableId = path.data(using: .utf8).map { data in
+      let hash = SHA256.hash(data: data)
+      return String(Data(hash).base64EncodedString()
+        .replacingOccurrences(of: "/", with: "-")
+        .replacingOccurrences(of: "+", with: "_")
+        .prefix(32))
+    } ?? UUID().uuidString
+
     let session = Session(
-      id: UUID().uuidString,
+      id: stableId,
       sessionId: sessionId,
       displayName: summary,
       timestamp: Date(timeIntervalSince1970: latestTimestamp),
@@ -202,7 +253,7 @@ final class HistoryParser {
       messageCount: max(1, messageCount)
     )
 
-    return ParsedSession(session: session, messages: messages)
+    return ParsedSession(session: session, messages: messages, messageDetails: messageDetails)
   }
 
   /// Get sessions with specified sorting and filtering
@@ -299,28 +350,16 @@ final class HistoryParser {
       allSessions.sort { $0.timestamp > $1.timestamp }
     }
 
-    parseResult.sessions = Array(allSessions.prefix(limit))
+    let limitedSessions = Array(allSessions.prefix(limit))
+    let limitedIds = Set(limitedSessions.map { $0.id })
+    parseResult.sessions = limitedSessions
+    parseResult.parsedSessions = parseResult.parsedSessions.filter { limitedIds.contains($0.session.id) }
     return parseResult
   }
 
   /// Get sessions sorted by most messages (original behavior)
   func getActiveSessions(limit: Int = 10) -> [Session] {
     return getSessions(sortOption: .mostActive, limit: limit)
-  }
-
-  private func getHistoryPath() -> String? {
-    let path = "\(claudePath)/history.jsonl"
-    if fileManager.fileExists(atPath: path) {
-      return path
-    }
-
-    // Try standard home directory path
-    let homePath = ("\(NSHomeDirectory())/.claude/history.jsonl" as NSString).expandingTildeInPath
-    if fileManager.fileExists(atPath: homePath) {
-      return homePath
-    }
-
-    return nil
   }
 
   /// Extract git repository name and current branch
@@ -414,11 +453,4 @@ final class HistoryParser {
 
     return (repoName, branch)
   }
-}
-
-/// Codable struct for history.jsonl entries (no longer used, kept for reference)
-private struct HistoryEntry: Codable {
-  let display: String?
-  let timestamp: TimeInterval
-  let project: String?
 }

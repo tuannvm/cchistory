@@ -26,6 +26,27 @@ cp .build/release/CCHistory CCHistory.app/Contents/MacOS/
 # Copy app icon to Resources
 cp CCHistory.icns CCHistory.app/Contents/Resources/
 
+# Copy webui bundle resources to Resources
+echo "Copying webui resources to app Resources..."
+
+# Try to copy from bundle first
+if [ -d ".build/release/CCHistory_CCHistory.bundle" ]; then
+  cp .build/release/CCHistory_CCHistory.bundle/*.html CCHistory.app/Contents/Resources/ 2>/dev/null || true
+  cp .build/release/CCHistory_CCHistory.bundle/*.css CCHistory.app/Contents/Resources/ 2>/dev/null || true
+  cp .build/release/CCHistory_CCHistory.bundle/*.js CCHistory.app/Contents/Resources/ 2>/dev/null || true
+fi
+
+# Fallback: copy from source directory if files not in bundle
+if [ ! -f "CCHistory.app/Contents/Resources/index.html" ]; then
+  echo "Bundle files missing, copying from source..."
+  cp Sources/CCHistory/webui/index.html CCHistory.app/Contents/Resources/
+  cp Sources/CCHistory/webui/css/styles.css CCHistory.app/Contents/Resources/
+  cp Sources/CCHistory/webui/js/app.js CCHistory.app/Contents/Resources/
+fi
+
+echo "Webui files copied:"
+ls -la CCHistory.app/Contents/Resources/ | grep -E "(index|styles|app\.js)"
+
 # Create Info.plist
 cat > CCHistory.app/Contents/Info.plist << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>

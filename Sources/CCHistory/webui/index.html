@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCHistory - Claude Code Sessions</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>CCHistory</h1>
+      <div class="search-box">
+        <input type="search" id="searchInput" placeholder="Search sessions..." autocomplete="off">
+        <button id="clearSearch" class="hidden" aria-label="Clear search">&times;</button>
+      </div>
+      <div class="filters">
+        <input type="text" id="projectFilter" placeholder="Filter by project path" autocomplete="off">
+        <select id="dateFilter">
+          <option value="all">All time</option>
+          <option value="hour">Last hour</option>
+          <option value="day">Last 24 hours</option>
+          <option value="week">Last week</option>
+        </select>
+      </div>
+    </header>
+
+    <main>
+      <div id="loadingIndicator" class="loading">
+        <div class="spinner"></div>
+        <p>Loading sessions...</p>
+      </div>
+      <div class="content">
+        <div class="sessions">
+          <div id="sessionsList" class="sessions-list hidden"></div>
+          <div id="noSessions" class="empty-state hidden">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <p>No sessions found</p>
+          </div>
+          <div id="noResults" class="empty-state hidden">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <p>No matching sessions</p>
+          </div>
+          <div id="errorState" class="error-state hidden">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>Failed to load sessions</p>
+            <button id="retryButton">Retry</button>
+          </div>
+        </div>
+        <aside id="messagesPanel" class="messages-panel hidden">
+          <div class="messages-header">
+            <button id="backButton" class="mobile-back-button" style="display: none;">← Back to Sessions</button>
+            <h2 id="messagesTitle">Session</h2>
+          </div>
+          <div id="messagesEmpty" class="messages-empty">Select a session to view messages.</div>
+          <div id="messagesList" class="messages-list"></div>
+        </aside>
+      </div>
+    </main>
+
+    <footer>
+      <div class="status-line">
+        <span id="connectionStatus" class="status-indicator connected" title="Connected"></span>
+        <span id="lastUpdated">Updating...</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
